@@ -1,0 +1,7 @@
+default.place.xml
+*.rbxl
+*.rbxlx
+*.rbxlx.lock
+*.rbxl.lock
+node_modules/
+sourcemap.json

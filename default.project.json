@@ -1,0 +1,127 @@
+{
+  "name": "BridgeRun",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+
+      "CountdownState": {
+        "$path": "src/ReplicatedStorage/CountdownState.luau"
+      },
+
+      "Remotes": {
+        "$className": "Folder",
+        "BonusEffect":         { "$className": "RemoteEvent" },
+        "ClientReady":         { "$className": "RemoteEvent" },
+        "LeaderboardUpdate":   { "$className": "RemoteEvent" },
+        "PlankCollected":      { "$className": "RemoteEvent" },
+        "PlankPickedUp":       { "$className": "RemoteEvent" },
+        "PlankPlaced":         { "$className": "RemoteEvent" },
+        "PlankUpdate":         { "$className": "RemoteEvent" },
+        "PlaySound":           { "$className": "RemoteEvent" },
+        "PlayerDied":          { "$className": "RemoteEvent" },
+        "PlayerFinished":      { "$className": "RemoteEvent" },
+        "PlayerRestart":       { "$className": "RemoteEvent" },
+        "SpawnPersonalPlanks": { "$className": "RemoteEvent" },
+        "StartCountdown":      { "$className": "RemoteEvent" },
+        "PlayerReady":         { "$className": "RemoteEvent" },
+        "RunStarted":          { "$className": "RemoteEvent" },
+        "TrampolineJump":      { "$className": "RemoteEvent" }
+      },
+
+      "Clones": {
+        "$className": "Folder"
+      }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+
+      "FinishTrigger": {
+        "$path": "src/ServerScriptService/FinishTrigger.server.luau"
+      },
+
+      "Trampoline": {
+        "$path": "src/ServerScriptService/Trampoline.server.luau"
+      },
+
+      "MainGame": {
+        "$path": "src/ServerScriptService/MainGame"
+      }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+
+        "AutoRun": {
+          "$path": "src/StarterCharacterScripts/AutoRun.client.luau"
+        },
+        "PersonalPlanks": {
+          "$path": "src/StarterCharacterScripts/PersonalPlanks.client.luau"
+        },
+        "PlankStack": {
+          "$path": "src/StarterCharacterScripts/PlankStack.client.luau"
+        }
+      },
+
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+
+        "BonusEffectClient": {
+          "$path": "src/StarterPlayerScripts/BonusEffectClient.client.luau"
+        },
+        "CameraLocal": {
+          "$path": "src/StarterPlayerScripts/CameraLocal.client.luau"
+        },
+        "SoundClient": {
+          "$path": "src/StarterPlayerScripts/SoundClient.client.luau"
+        },
+        "DrownEffect": {
+          "$path": "src/StarterPlayerScripts/DrownEffect.client.luau"
+        },
+        "MapEffects": {
+          "$path": "src/StarterPlayerScripts/MapEffects.client.luau"
+        }
+      }
+    },
+
+    "StarterGui": {
+      "$className": "StarterGui",
+
+      "CountdownGui": {
+        "$className": "ScreenGui",
+        "$properties": { "ResetOnSpawn": false },
+        "CountdownLocal": {
+          "$path": "src/StarterGui/CountdownGui/Countdown.client.luau"
+        }
+      },
+
+      "FinishScreen": {
+        "$className": "ScreenGui",
+        "$properties": { "ResetOnSpawn": false },
+        "FinishLocal": {
+          "$path": "src/StarterGui/FinishScreen/Finish.client.luau"
+        }
+      },
+
+      "HudGui": {
+        "$className": "ScreenGui",
+        "HudScript": {
+          "$path": "src/StarterGui/HudGui/HudGui.client.luau"
+        }
+      },
+
+      "LeaderboardGui": {
+        "$className": "ScreenGui",
+        "$properties": { "ResetOnSpawn": false },
+        "LeaderboardLocal": {
+          "$path": "src/StarterGui/LeaderboardGui/Leaderboard.client.luau"
+        }
+      }
+    }
+  }
+}
