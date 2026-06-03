@@ -65,6 +65,8 @@ src/
     ├── HudGui/
     └── LeaderboardGui/
 ```
+## Play
+[Play on Roblox](https://www.roblox.com/games/10159407224)
 
 ## Built With
 
