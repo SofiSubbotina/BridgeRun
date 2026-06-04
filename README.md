@@ -1,6 +1,5 @@
 # 🌉 Bridge Run
 <img width="1351" height="646" alt="image" src="https://github.com/user-attachments/assets/eb21cfe6-90b5-490c-ba7b-3e42cc4f9c71" />
-<img width="1353" height="626" alt="image" src="https://github.com/user-attachments/assets/3a52e396-1a69-49d7-a615-a4905e8d5965" />
 
 A Roblox game where players collect planks and build a bridge across water in real time — racing against others to reach the finish line.
 
