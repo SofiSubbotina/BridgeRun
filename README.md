@@ -1,4 +1,4 @@
-# 🌉 Bridge Run
+# 🌉 Plank Rush
 <img width="1351" height="646" alt="image" src="https://github.com/user-attachments/assets/eb21cfe6-90b5-490c-ba7b-3e42cc4f9c71" />
 
 A Roblox game where players collect planks and build a bridge across water in real time — racing against others to reach the finish line.
