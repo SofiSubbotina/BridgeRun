@@ -68,10 +68,3 @@ src/
 ```
 ## Play
 [Play on Roblox](https://www.roblox.com/games/97476080303924/Plank-Rush)
-
-## Built With
-
-- Luau
-- Roblox Studio
-- Rojo
-- Git
