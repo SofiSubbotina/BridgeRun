@@ -1,3 +1,7 @@
+-- PersonalPlanks.client.luau
+-- Manages the local player's collectible plank pickups.
+-- Uses an object pool to avoid Clone/Destroy on every respawn.
+
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,6 +16,7 @@ local planksTemplate = ReplicatedStorage
 	:WaitForChild("Clones")
 	:WaitForChild("PlanksTemplate")
 
+-- Per-player folder keeps workspace tidy and avoids name collisions
 local planksFolder = workspace:FindFirstChild("PersonalPlanks_" .. player.UserId)
 if planksFolder then
 	planksFolder:ClearAllChildren()
@@ -21,15 +26,12 @@ else
 	planksFolder.Parent = workspace
 end
 
-local myPlanks = {}
+-- ── Object pool ───────────────────────────────────────────────────────────
+-- Pool entry: { part, templateName, amount, connection }
+-- Parts are created once at startup and reused every run.
 
-local function clearPlanks()
-	for _, p in ipairs(myPlanks) do
-		if p and p.Parent then p:Destroy() end
-	end
-	myPlanks = {}
-	planksFolder:ClearAllChildren()
-end
+local pool = {}  -- all pool entries
+local HIDE_POS = CFrame.new(0, -500, 0)  -- off-map position for inactive parts
 
 local function attachBillboard(part, amount)
 	if part:FindFirstChild("PlankBillboard") then return end
@@ -73,48 +75,83 @@ local function attachBillboard(part, amount)
 	label.TextXAlignment         = Enum.TextXAlignment.Left
 end
 
-local function spawnMyPlanks()
-	clearPlanks()
-
+-- Build the pool once from the template folder.
+-- Each template part becomes one permanent pool entry.
+local function buildPool()
 	for _, template in ipairs(planksTemplate:GetChildren()) do
-		local p = template:Clone()
-		p.CFrame     = template.CFrame
-		p.Anchored   = true
-		p.CanCollide = true
-		p.CanTouch   = true
-		p.Parent     = planksFolder
+		local amount = template:GetAttribute("Planks") or 1
 
-		local amount = p:GetAttribute("Planks") or 1
-		attachBillboard(p, amount)
+		local part = template:Clone()
+		part.Anchored   = true
+		part.CanCollide = false
+		part.CanTouch   = false
+		part.CFrame     = HIDE_POS
+		part.Parent     = planksFolder
+
+		attachBillboard(part, amount)
+
+		table.insert(pool, {
+			part         = part,
+			templateName = template.Name,
+			amount       = amount,
+			templateCF   = template.CFrame,
+			connection   = nil,
+		})
+	end
+end
+
+-- Hides a pool entry back to the off-map position and disconnects its touch.
+local function hideEntry(entry)
+	entry.part.CFrame     = HIDE_POS
+	entry.part.CanCollide = false
+	entry.part.CanTouch   = false
+	entry.part.Transparency = 1
+
+	if entry.connection then
+		entry.connection:Disconnect()
+		entry.connection = nil
+	end
+end
+
+-- Hides all pool entries (called on respawn before showing them again).
+local function hideAll()
+	for _, entry in ipairs(pool) do
+		hideEntry(entry)
+	end
+end
+
+-- Places all pool entries at their template positions and connects touch events.
+local function spawnMyPlanks()
+	hideAll()
+
+	for _, entry in ipairs(pool) do
+		local part = entry.part
+		part.CFrame       = entry.templateCF
+		part.CanCollide   = true
+		part.CanTouch     = true
+		part.Transparency = 0
 
 		local debounce = false
-		p.Touched:Connect(function(hit)
+		entry.connection = part.Touched:Connect(function(hit)
 			if debounce then return end
 			local char = player.Character
 			if not char then return end
 			if not hit:IsDescendantOf(char) then return end
 			debounce = true
 
-			p.Transparency = 1
-			p.CanCollide   = false
-			p.CanTouch     = false
-
-			-- Отправляем имя шаблона, сервер сам знает сколько досок
-			evPickup:FireServer(template.Name)
-
-			task.delay(0.1, function()
-				if p and p.Parent then p:Destroy() end
-			end)
+			-- Hide immediately on touch — server handles the actual count
+			hideEntry(entry)
+			evPickup:FireServer(entry.templateName)
 		end)
-
-		table.insert(myPlanks, p)
 	end
 end
 
-evSpawnPlanks.OnClientEvent:Connect(function()
-	spawnMyPlanks()
-end)
+-- ── Lifecycle ─────────────────────────────────────────────────────────────
+
+buildPool()
+
+evSpawnPlanks.OnClientEvent:Connect(spawnMyPlanks)
 
 evReady:FireServer()
 
-player.CharacterRemoving:Connect(clearPlanks)
+player.CharacterRemoving:Connect(hideAll)
