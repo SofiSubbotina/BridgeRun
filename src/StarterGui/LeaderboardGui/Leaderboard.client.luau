@@ -1,8 +1,10 @@
-local Players           = game:GetService("Players")
+-- Leaderboard.client.luau
+-- Renders the top-10 records panel and the live active-players timer.
+-- Receives LeaderboardData from the server via LeaderboardUpdate remote.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 
-local player        = Players.LocalPlayer
 local remotes       = ReplicatedStorage:WaitForChild("Remotes")
 local evLeaderboard = remotes:WaitForChild("LeaderboardUpdate")
 
@@ -11,6 +13,31 @@ local panel      = gui:WaitForChild("Panel")
 local top10List  = panel:WaitForChild("Top5List")
 local activeList = panel:WaitForChild("ActiveList")
 
+-- ── Type definitions ──────────────────────────────────────────────────────
+
+type LeaderboardEntry = {
+	name:       string,
+	bestTime:   number?,  -- nil if player hasn't finished yet
+	finishTime: number?,  -- elapsed seconds for this run, nil if still running
+	startTime:  number,   -- tick() when the run started
+	finished:   boolean,
+}
+type LeaderboardData = {
+	active:     { LeaderboardEntry },  -- all players currently in a run
+	top10:      { LeaderboardEntry },  -- all-time top 10 from OrderedDataStore
+	serverTime: number,                -- server tick() at broadcast time (for clock sync)
+}
+
+-- Initialised with empty arrays so Heartbeat guard `lastData.active` is safe
+-- before the first server broadcast arrives.
+local lastData: LeaderboardData = { active = {}, top10 = {}, serverTime = 0 }
+
+-- Stores per-player timer state so the Heartbeat loop can interpolate live times.
+local activeTimer = {}
+
+-- ── Helpers ───────────────────────────────────────────────────────────────
+
+-- Formats a time in seconds as "M:SS.mm" (e.g. "1:04.32").
 local function formatTime(seconds)
 	if not seconds then return "--:--" end
 	if seconds < 0 then seconds = 0 end
@@ -19,6 +46,7 @@ local function formatTime(seconds)
 	return string.format("%d:%05.2f", m, s)
 end
 
+-- Adds a UIListLayout to `parent` if one doesn't already exist.
 local function ensureLayout(parent)
 	if not parent:FindFirstChildOfClass("UIListLayout") then
 		local l = Instance.new("UIListLayout", parent)
@@ -27,6 +55,8 @@ local function ensureLayout(parent)
 	end
 end
 
+-- Creates a single leaderboard row with place number, player name, and time.
+-- Gold background is applied to 1st place.
 local function makeRow(parent, index, name, timeText, color, isGold)
 	local row = Instance.new("Frame")
 	row.Size               = UDim2.new(1, 0, 0, 24)
@@ -73,25 +103,27 @@ local function makeRow(parent, index, name, timeText, color, isGold)
 	return row
 end
 
-local lastData    = {}
-local activeTimer = {}
-
+-- Removes all Frame children from a list container.
 local function clearList(list)
 	for _, c in ipairs(list:GetChildren()) do
 		if c:IsA("Frame") then c:Destroy() end
 	end
 end
 
-local function updateLeaderboard(data)
+-- ── Leaderboard update ────────────────────────────────────────────────────
+
+-- Rebuilds both panels whenever the server broadcasts new leaderboard data.
+local function updateLeaderboard(data: LeaderboardData)
 	lastData = data
 
+	-- Snapshot server time so live timers stay in sync with the server clock.
 	local serverNow = data.serverTime
 	activeTimer = {}
 	for i, entry in ipairs(data.active) do
 		if not entry.finished then
 			activeTimer[i] = {
 				elapsed    = serverNow and (serverNow - entry.startTime) or 0,
-				receivedAt = tick(),
+				receivedAt = tick(),  -- local time of receipt for interpolation
 			}
 		end
 	end
@@ -99,6 +131,7 @@ local function updateLeaderboard(data)
 	ensureLayout(top10List)
 	ensureLayout(activeList)
 
+	-- Rebuild top-10 panel
 	clearList(top10List)
 	if #data.top10 == 0 then
 		local empty = Instance.new("TextLabel", top10List)
@@ -118,6 +151,7 @@ local function updateLeaderboard(data)
 		end
 	end
 
+	-- Rebuild active-players panel
 	clearList(activeList)
 	for i, entry in ipairs(data.active) do
 		local timeText, color
@@ -133,6 +167,10 @@ local function updateLeaderboard(data)
 	end
 end
 
+-- ── Live timer interpolation ──────────────────────────────────────────────
+
+-- Updates the displayed time for each still-running player every frame,
+-- interpolating locally so the timer looks smooth without server spam.
 RunService.Heartbeat:Connect(function()
 	if not lastData.active then return end
 	local rows = activeList:GetChildren()
