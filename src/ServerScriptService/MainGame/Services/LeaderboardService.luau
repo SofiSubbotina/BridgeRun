@@ -18,12 +18,18 @@ local current   = {}
 local records   = {}
 local top10Cache = {}
 
+local CONFIG = {
+    TOP_COUNT    = 10,  -- how many places in the top
+    MAX_RETRIES  = 3,   -- how many attempts to save
+}
 -- ── Save Queue ────────────────────────────────────────────────────────────
 -- Roblox throttle: no more than 1 SetAsync/UpdateAsync per key every 6 seconds.
 -- The queue guarantees that requests are processed one at a time and are not lost.
 
 local saveQueue  = {}   -- { userId, attempt }
 local isSaving   = false
+
+local refreshTop10
 
 local function processSaveQueue()
 	if isSaving then return end
@@ -57,7 +63,7 @@ local function processSaveQueue()
 
 	if not ok then
 		warn("[LeaderboardService] Save failed, attempt", attempt, ":", err)
-		if attempt < 3 then
+		if attempt < CONFIG.MAX_RETRIES then
 			task.delay(2 ^ attempt, function()
 				table.insert(saveQueue, { userId = userId, attempt = attempt + 1 })
 				isSaving = false
@@ -65,7 +71,7 @@ local function processSaveQueue()
 			end)
 			return
 		else
-			warn("[LeaderboardService] Player record", userId, "was lost after 3 attempts")
+			warn("[LeaderboardService] Рекорд игрока", userId, "потерян после", CONFIG.MAX_RETRIES, "попыток")
 		end
 	else
 		-- Update OrderedDataStore only if the main save succeeded
@@ -73,7 +79,7 @@ local function processSaveQueue()
 			orderedStore:SetAsync(tostring(userId), timeMs)
 		end)
 		if not okOrd then
-			warn("[LeaderboardService] OrderedDataStore was not updated:", errOrd)
+			warn("[LeaderboardService] OrderedDataStore не обновлён:", errOrd)
 		else
 			task.defer(refreshTop10)
 		end
@@ -96,7 +102,7 @@ local needsRefresh  = false
 -- Protection against request spam:
 -- if refreshTop10 is already running,
 -- simply mark that another refresh is needed after completion.
-function refreshTop10(attempt)
+refreshTop10 = function(attempt)
 	if isRefreshing then
 		needsRefresh = true
 		return
@@ -107,13 +113,13 @@ function refreshTop10(attempt)
 	attempt = attempt or 1
 
 	local ok, result = pcall(function()
-		local pages = orderedStore:GetSortedAsync(true, 10)
+		local pages = orderedStore:GetSortedAsync(true, CONFIG.TOP_COUNT)
 		return pages:GetCurrentPage()
 	end)
 
 	if not ok then
-		warn("[LeaderboardService] Failed to load Top 10, attempt", attempt, ":", result)
-		if attempt < 3 then
+		warn("[LeaderboardService] Топ-10 не загружен, попытка", attempt, ":", result)
+		if attempt < CONFIG.MAX_RETRIES then
 			task.delay(2 ^ attempt, function()
 				isRefreshing = false
 				refreshTop10(attempt + 1)
@@ -161,7 +167,7 @@ local function loadPlayerRecord(player, attempt)
 	end)
 	if not ok then
 		warn("[LeaderboardService] Failed to load record, attempt", attempt, ":", result)
-		if attempt < 3 then
+		if attempt < CONFIG.MAX_RETRIES then
 			task.delay(2 ^ attempt, function() loadPlayerRecord(player, attempt + 1) end)
 		end
 		return
