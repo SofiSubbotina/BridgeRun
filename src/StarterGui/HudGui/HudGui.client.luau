@@ -1,4 +1,7 @@
--- HudGui
+-- HudGui.client.luau
+-- Displays the local player's current plank count.
+-- Filters PlankUpdate by UserId since it fires for all players.
+
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService      = game:GetService("TweenService")

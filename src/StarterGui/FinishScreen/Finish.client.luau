@@ -1,3 +1,6 @@
+-- Finish.client.luau
+-- Shows the finish card with time, record, and attempts.
+
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -1,3 +1,6 @@
+-- CameraLocal.client.luau
+-- Fixed third-person camera that follows the player from behind.
+
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
 

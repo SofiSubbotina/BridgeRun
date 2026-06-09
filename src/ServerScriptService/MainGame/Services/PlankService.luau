@@ -1,4 +1,7 @@
--- PlankService 
+-- PlankService
+-- Tracks plank counts for all active players on the server.
+-- Intentionally minimal: validation and cooldowns live in the callers.
+
 local PlankService = {}
 
 local data = {}
@@ -8,6 +11,7 @@ function PlankService.Init(player)
 	data[player.UserId] = { planks = 0 }
 end
 
+-- Negative amount subtracts. Always clamps to >= 0.
 function PlankService.Add(player, amount)
 	local d = data[player.UserId]
 	if not d then return 0 end

@@ -1,3 +1,7 @@
+-- AutoRun.client.luau
+-- Forces the character forward and handles left/right steering.
+-- Also syncs the trampoline flip animation across clients.
+
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
 local UserInputService  = game:GetService("UserInputService")

@@ -1,3 +1,7 @@
+-- BonusEffectClient.client.luau
+-- Shows floating +N/-N text and particle burst on bonus/penalty walls.
+-- Pure visual — all plank math happens server-side in BonusService.
+
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris            = game:GetService("Debris")

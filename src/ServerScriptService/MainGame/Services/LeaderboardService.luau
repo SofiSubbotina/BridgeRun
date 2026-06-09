@@ -1,4 +1,7 @@
 -- LeaderboardService
+-- Tracks active runs, personal records, and the global top-10.
+-- Saves records via an async queue with exponential backoff retry.
+
 local LeaderboardService = {}
 
 local Players           = game:GetService("Players")
@@ -104,7 +107,7 @@ function refreshTop10(attempt)
 	attempt = attempt or 1
 
 	local ok, result = pcall(function()
-		local pages = orderedStore:GetSortedAsync(true, 10) -- was 5, now 10
+		local pages = orderedStore:GetSortedAsync(true, 10)
 		return pages:GetCurrentPage()
 	end)
 
@@ -185,7 +188,7 @@ end
 
 function LeaderboardService.Broadcast()
 	evLeaderboard:FireAllClients({
-		top10      = top10Cache, -- was top5, now top10
+		top10      = top10Cache, 
 		active     = getActive(),
 		serverTime = tick(),
 	})

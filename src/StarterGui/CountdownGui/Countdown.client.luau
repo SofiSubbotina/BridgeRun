@@ -1,3 +1,7 @@
+-- Countdown.client.luau
+-- Shows 3-2-1-GO on first spawn.
+-- Flow: server fires StartCountdown → client animates → fires PlayerReady back.
+
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players           = game:GetService("Players")
