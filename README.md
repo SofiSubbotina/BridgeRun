@@ -30,7 +30,29 @@ A Roblox game where players collect planks and build a bridge across water in re
 - Live leaderboard with client-side timer interpolation
 - Countdown system with shared state module
 
-**Tools & workflow**
+## Technical Decisions
+
+**Object pooling for performance**
+Cloning parts every time a plank is placed caused visible frame spikes.
+I switched to pre-allocating a pool of 100 parts in batches (20 per frame)
+so the server never stalls mid-run.
+
+**Reliable DataStore saves**
+A simple SetAsync call loses data under Roblox throttling.
+I built an async save queue with exponential backoff retry and a BindToClose
+safety flush — so records survive both normal play and server shutdowns.
+
+**Client-server sync without spam**
+The leaderboard timer updates every frame on the client via local interpolation,
+while the server only broadcasts on actual state changes.
+This keeps the UI smooth without flooding the network.
+
+**Separating concerns in a game server**
+Splitting logic into BridgeService / PlankService / BonusService / LeaderboardService
+made it easy to reason about each system independently and avoid spaghetti
+between unrelated features.
+
+## Tools & Workflow
 - [Rojo](https://rojo.space/) for VS Code ↔ Roblox Studio sync
 - Git + GitHub for version control
 
