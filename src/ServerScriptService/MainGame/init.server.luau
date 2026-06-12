@@ -189,6 +189,7 @@ Players.PlayerAdded:Connect(function(player)
 			-- Respawn after death
 			playerStatus[player.UserId] = "alive"
 			LeaderboardService.Respawn(player)
+			BonusService.ResetDebounce(player)
 		end
 
 		setupCharacter(player, char)

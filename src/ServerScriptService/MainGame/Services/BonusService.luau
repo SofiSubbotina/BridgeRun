@@ -71,4 +71,8 @@ function BonusService.Cleanup(player)
 	debounce[player.UserId] = nil
 end
 
+function BonusService.ResetDebounce(player)
+    debounce[player.UserId] = {}
+end
+
 return BonusService
