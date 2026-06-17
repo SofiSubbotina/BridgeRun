@@ -19,8 +19,8 @@ local records   = {}
 local top10Cache = {}
 
 local CONFIG = {
-    TOP_COUNT    = 10,  -- how many places in the top
-    MAX_RETRIES  = 3,   -- how many attempts to save
+	TOP_COUNT    = 10,  -- how many places in the top
+	MAX_RETRIES  = 3,   -- how many attempts to save
 }
 -- ── Save Queue ────────────────────────────────────────────────────────────
 -- Roblox throttle: no more than 1 SetAsync/UpdateAsync per key every 6 seconds.
@@ -224,6 +224,12 @@ function LeaderboardService.AddAttempt(player)
 	local d = current[player.UserId]
 	if not d then return end
 	d.attempts = d.attempts + 1
+end
+
+function LeaderboardService.PeekElapsed(player)
+	local d = current[player.UserId]
+	if not d or d.finished then return nil end
+	return tick() - d.startTime
 end
 
 function LeaderboardService.Finish(player)

@@ -1,6 +1,3 @@
--- FinishTrigger
--- Detects when a player touches the finish part and handles end-of-run logic.
-
 local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -18,9 +15,9 @@ local LeaderboardService = require(ServerScriptService.MainGame.Services.Leaderb
 local finish = workspace:WaitForChild("Finish"):WaitForChild("FinishPart")
 
 local CONFIG = {
-	MIN_FINISH_TIME  = 25, -- runs faster than this are ignored (anti-cheat)
-	FINISH_COOLDOWN  = 15, -- seconds before the finished flag resets
-	RESTART_COOLDOWN = 3,  -- prevents restart button spam
+	MIN_FINISH_TIME  = 45,  -- меньше этого времени финиш не засчитывается
+	FINISH_COOLDOWN  = 15,  -- секунд до сброса флага finished
+	RESTART_COOLDOWN = 3,   -- защита от спама кнопки рестарта
 }
 
 local finished        = {}
@@ -31,15 +28,20 @@ finish.Touched:Connect(function(hit)
 	local player    = Players:GetPlayerFromCharacter(character)
 	if not player then return end
 	if finished[player.UserId] then return end
+
+	local peeked = LeaderboardService.PeekElapsed(player)
+	if not peeked or peeked < CONFIG.MIN_FINISH_TIME then
+		return
+	end
+
 	finished[player.UserId] = true
 
 	local elapsed, bestTime, attempts = LeaderboardService.Finish(player)
-	if not elapsed or elapsed < CONFIG.MIN_FINISH_TIME then
+	if not elapsed then
 		finished[player.UserId] = nil
 		return
 	end
 
-	-- Freeze player on finish
 	local humanoid = character:FindFirstChild("Humanoid")
 	local root     = character:FindFirstChild("HumanoidRootPart")
 
