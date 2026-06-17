@@ -10,6 +10,7 @@ local PlankService       = require(script.Services.PlankService)
 local BridgeService      = require(script.Services.BridgeService)
 local BonusService       = require(script.Services.BonusService)
 local LeaderboardService = require(script.Services.LeaderboardService)
+local CharacterLock      = require(script.Services.CharacterLock)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
@@ -50,30 +51,6 @@ local pickupDebounce = {}
 
 local function syncPlanks(player)
 	evUpdate:FireAllClients(player.UserId, PlankService.Get(player))
-end
-
-local function freezePlayer(character)
-	local root     = character:FindFirstChild("HumanoidRootPart")
-	local humanoid = character:FindFirstChild("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = 0
-		humanoid.JumpPower = 0
-	end
-	if root then
-		root.Anchored = true
-	end
-end
-
-local function unfreezePlayer(character)
-	local root     = character:FindFirstChild("HumanoidRootPart")
-	local humanoid = character:FindFirstChild("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = CONFIG.WALK_SPEED
-		humanoid.JumpPower = CONFIG.JUMP_POWER
-	end
-	if root then
-		root.Anchored = false
-	end
 end
 
 local function handleDrown(player, character, humanoid, conn)
@@ -154,7 +131,7 @@ evPlayerReady.OnServerEvent:Connect(function(player)
 	if not character then return end
 
 	playerStatus[player.UserId] = "alive"
-	unfreezePlayer(character)
+	CharacterLock.Unfreeze(character, CONFIG.WALK_SPEED, CONFIG.JUMP_POWER)
 	LeaderboardService.Init(player)
 end)
 
@@ -187,7 +164,7 @@ Players.PlayerAdded:Connect(function(player)
 			-- First spawn: freeze and show countdown.
 			firstSpawn = false
 			playerStatus[player.UserId] = "frozen"
-			freezePlayer(char)
+			CharacterLock.Freeze(char)
 			evStartCountdown:FireClient(player)
 		else
 			-- Respawn after death: resume immediately.

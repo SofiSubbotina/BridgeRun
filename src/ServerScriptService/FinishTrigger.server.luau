@@ -11,6 +11,7 @@ local evSound   = remotes:WaitForChild("PlaySound")
 local PlankService       = require(ServerScriptService.MainGame.Services.PlankService)
 local BridgeService      = require(ServerScriptService.MainGame.Services.BridgeService)
 local LeaderboardService = require(ServerScriptService.MainGame.Services.LeaderboardService)
+local CharacterLock = require(ServerScriptService.MainGame.Services.CharacterLock)
 
 local finish = workspace:WaitForChild("Finish"):WaitForChild("FinishPart")
 
@@ -45,15 +46,7 @@ finish.Touched:Connect(function(hit)
 	local humanoid = character:FindFirstChild("Humanoid")
 	local root     = character:FindFirstChild("HumanoidRootPart")
 
-	if humanoid then
-		humanoid.WalkSpeed = 0
-		humanoid.JumpPower = 0
-	end
-	if root then
-		root.AssemblyLinearVelocity  = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
-		root.Anchored = true
-	end
+	CharacterLock.Freeze(character, true)
 
 	PlankService.Reset(player)
 	evUpdate:FireClient(player, 0)
