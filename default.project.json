@@ -27,7 +27,8 @@
         "StartCountdown":      { "$className": "RemoteEvent" },
         "PlayerReady":         { "$className": "RemoteEvent" },
         "RunStarted":          { "$className": "RemoteEvent" },
-        "TrampolineJump":      { "$className": "RemoteEvent" }
+        "TrampolineJump":      { "$className": "RemoteEvent" },
+        "LevelUnlocked":       { "$className": "RemoteEvent" }
       },
 
       "Clones": {
@@ -42,12 +43,20 @@
         "$path": "src/ServerScriptService/FinishTrigger.server.luau"
       },
 
-      "Trampoline": {
-        "$path": "src/ServerScriptService/Trampoline.server.luau"
+      "LevelEnds": {
+        "$path": "src/ServerScriptService/LevelEnds.server.luau"
       },
 
       "MainGame": {
         "$path": "src/ServerScriptService/MainGame"
+      }
+    },
+
+    "ServerStorage": {
+      "$className": "ServerStorage",
+
+      "Whirlpool": {
+        "$path": "src/ServerStorage/Whirlpool.luau"
       }
     },
 
@@ -85,6 +94,9 @@
         },
         "MapEffects": {
           "$path": "src/StarterPlayerScripts/MapEffects.client.luau"
+        },
+        "LevelVisibility": {
+          "$path": "src/StarterPlayerScripts/LevelVisibility.client.luau"
         }
       }
     },
