@@ -1,6 +1,7 @@
 -- PersonalPlanks.client.luau
 -- Manages the local player's collectible plank pickups.
--- Uses an object pool to avoid Clone/Destroy on every respawn.
+-- Planks are organised by level under PlanksTemplate/Level1, Level2, etc.
+-- Only planks belonging to unlocked levels are shown and interactable.
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,15 +9,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player  = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
-local evSpawnPlanks = remotes:WaitForChild("SpawnPersonalPlanks")
-local evPickup      = remotes:WaitForChild("PlankPickedUp")
-local evReady       = remotes:WaitForChild("ClientReady")
+local evSpawnPlanks   = remotes:WaitForChild("SpawnPersonalPlanks")
+local evPickup        = remotes:WaitForChild("PlankPickedUp")
+local evReady         = remotes:WaitForChild("ClientReady")
+local evLevelUnlocked = remotes:WaitForChild("LevelUnlocked")
 
 local planksTemplate = ReplicatedStorage
 	:WaitForChild("Clones")
 	:WaitForChild("PlanksTemplate")
 
--- Per-player folder keeps workspace tidy and avoids name collisions
+-- Per-player folder keeps workspace tidy and avoids name collisions.
 local planksFolder = workspace:FindFirstChild("PersonalPlanks_" .. player.UserId)
 if planksFolder then
 	planksFolder:ClearAllChildren()
@@ -26,12 +28,13 @@ else
 	planksFolder.Parent = workspace
 end
 
--- ── Object pool ───────────────────────────────────────────────────────────
--- Pool entry: { part, templateName, amount, connection }
--- Parts are created once at startup and reused every run.
+-- ── State ─────────────────────────────────────────────────────────────────
 
-local pool = {}  -- all pool entries
-local HIDE_POS = CFrame.new(0, -500, 0)  -- off-map position for inactive parts
+local pool          = {} -- all pool entries across all levels
+local unlockedLevel = 1  -- highest level currently unlocked for this client
+local HIDE_POS      = CFrame.new(0, -500, 0) -- off-map position for inactive parts
+
+-- ── Billboard ─────────────────────────────────────────────────────────────
 
 local function attachBillboard(part, amount)
 	if part:FindFirstChild("PlankBillboard") then return end
@@ -75,10 +78,11 @@ local function attachBillboard(part, amount)
 	label.TextXAlignment         = Enum.TextXAlignment.Left
 end
 
--- Build the pool once from the template folder.
--- Each template part becomes one permanent pool entry.
-local function buildPool()
-	for _, template in ipairs(planksTemplate:GetChildren()) do
+-- ── Pool ──────────────────────────────────────────────────────────────────
+
+-- Builds pool entries from a single level folder.
+local function buildPoolForLevel(levelFolder, levelId)
+	for _, template in ipairs(levelFolder:GetChildren()) do
 		local amount = template:GetAttribute("Planks") or 1
 
 		local part = template:Clone()
@@ -95,16 +99,28 @@ local function buildPool()
 			templateName = template.Name,
 			amount       = amount,
 			templateCF   = template.CFrame,
+			levelId      = levelId,
 			connection   = nil,
 		})
 	end
 end
 
--- Hides a pool entry back to the off-map position and disconnects its touch.
+-- Builds pool entries for all level folders found in PlanksTemplate.
+local function buildPool()
+	for _, levelFolder in ipairs(planksTemplate:GetChildren()) do
+		local levelId = tonumber(levelFolder.Name:match("^Level(%d+)$"))
+		if levelId then
+			buildPoolForLevel(levelFolder, levelId)
+		end
+	end
+end
+
+-- ── Show / Hide ───────────────────────────────────────────────────────────
+
 local function hideEntry(entry)
-	entry.part.CFrame     = HIDE_POS
-	entry.part.CanCollide = false
-	entry.part.CanTouch   = false
+	entry.part.CFrame       = HIDE_POS
+	entry.part.CanCollide   = false
+	entry.part.CanTouch     = false
 	entry.part.Transparency = 1
 
 	if entry.connection then
@@ -113,36 +129,51 @@ local function hideEntry(entry)
 	end
 end
 
--- Hides all pool entries (called on respawn before showing them again).
 local function hideAll()
 	for _, entry in ipairs(pool) do
 		hideEntry(entry)
 	end
 end
 
--- Places all pool entries at their template positions and connects touch events.
+-- Activates a single pool entry and connects its touch event.
+local function showEntry(entry)
+	local part = entry.part
+	part.CFrame       = entry.templateCF
+	part.CanCollide   = true
+	part.CanTouch     = true
+	part.Transparency = 0
+
+	local debounce = false
+	entry.connection = part.Touched:Connect(function(hit)
+		if debounce then return end
+		local char = player.Character
+		if not char then return end
+		if not hit:IsDescendantOf(char) then return end
+		debounce = true
+
+		-- Hide immediately on touch — server handles the actual count.
+		hideEntry(entry)
+		evPickup:FireServer(entry.templateName)
+	end)
+end
+
+-- Shows all planks belonging to unlocked levels.
 local function spawnMyPlanks()
 	hideAll()
 
 	for _, entry in ipairs(pool) do
-		local part = entry.part
-		part.CFrame       = entry.templateCF
-		part.CanCollide   = true
-		part.CanTouch     = true
-		part.Transparency = 0
+		if entry.levelId <= unlockedLevel then
+			showEntry(entry)
+		end
+	end
+end
 
-		local debounce = false
-		entry.connection = part.Touched:Connect(function(hit)
-			if debounce then return end
-			local char = player.Character
-			if not char then return end
-			if not hit:IsDescendantOf(char) then return end
-			debounce = true
-
-			-- Hide immediately on touch — server handles the actual count
-			hideEntry(entry)
-			evPickup:FireServer(entry.templateName)
-		end)
+-- Shows planks belonging to a specific level (called on unlock).
+local function spawnPlanksForLevel(levelId)
+	for _, entry in ipairs(pool) do
+		if entry.levelId == levelId then
+			showEntry(entry)
+		end
 	end
 end
 
@@ -150,7 +181,14 @@ end
 
 buildPool()
 
+-- Spawn all currently unlocked planks on respawn.
 evSpawnPlanks.OnClientEvent:Connect(spawnMyPlanks)
+
+-- Spawn planks for the newly unlocked level.
+evLevelUnlocked.OnClientEvent:Connect(function(levelId)
+	unlockedLevel = levelId
+	spawnPlanksForLevel(levelId)
+end)
 
 evReady:FireServer()
 

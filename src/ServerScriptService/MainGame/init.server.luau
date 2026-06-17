@@ -1,5 +1,6 @@
--- MainGame
--- Manages player lifecycle: spawning, planks, drowning, finish, cleanup.
+-- MainGame.server.luau
+-- Manages player lifecycle: character setup, bridge walking,
+-- plank pickup, drowning, and cleanup on death or disconnect.
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -21,14 +22,17 @@ local evReady          = remotes:WaitForChild("ClientReady")
 local evPlayerReady    = remotes:WaitForChild("PlayerReady")
 local evStartCountdown = remotes:WaitForChild("StartCountdown")
 
--- Preload plank amounts from template folder
+-- Plank amounts keyed by template name, used to validate pickup events.
+-- PlanksTemplate is organised into per-level sub-folders (Level1, Level2, …).
 local planksTemplate = ReplicatedStorage
 	:WaitForChild("Clones")
 	:WaitForChild("PlanksTemplate")
 
 local templateData = {}
-for _, part in ipairs(planksTemplate:GetChildren()) do
-	templateData[part.Name] = part:GetAttribute("Planks") or 1
+for _, levelFolder in ipairs(planksTemplate:GetChildren()) do
+	for _, part in ipairs(levelFolder:GetChildren()) do
+		templateData[part.Name] = part:GetAttribute("Planks") or 1
+	end
 end
 
 local CONFIG = {
@@ -36,8 +40,8 @@ local CONFIG = {
 	JUMP_POWER         = 25,
 	DROWN_DELAY        = 1.5,  -- seconds before humanoid health is set to 0
 	CLEANUP_DELAY      = 3,    -- seconds before bridge cleanup after death
-	HEARTBEAT_INTERVAL = 0.05, -- minimum seconds between water checks
-	PICKUP_COOLDOWN    = 0.3,  -- minimum seconds between plank pickups
+	HEARTBEAT_INTERVAL = 0.05, -- minimum seconds between water checks per player
+	PICKUP_COOLDOWN    = 0.3,  -- minimum seconds between plank pickup events
 }
 
 local playerStatus   = {} -- "frozen" | "alive" | "dead"
@@ -135,7 +139,7 @@ local function setupCharacter(player, character)
 	end)
 end
 
--- Fire spawn planks to client once it signals ready
+-- Fire spawn planks to client once it signals ready.
 evReady.OnServerEvent:Connect(function(player)
 	if playerStatus[player.UserId] == "frozen"
 		or playerStatus[player.UserId] == "alive" then
@@ -143,7 +147,7 @@ evReady.OnServerEvent:Connect(function(player)
 	end
 end)
 
--- Unfreeze player after countdown finishes
+-- Unfreeze player after countdown finishes.
 evPlayerReady.OnServerEvent:Connect(function(player)
 	if playerStatus[player.UserId] ~= "frozen" then return end
 	local character = player.Character
@@ -155,7 +159,7 @@ evPlayerReady.OnServerEvent:Connect(function(player)
 end)
 
 Players.PlayerAdded:Connect(function(player)
-	-- Listen for plank pickup events from this player
+	-- Listen for plank pickup events from this player.
 	local pickupConn = evPickup.OnServerEvent:Connect(function(plr, partName)
 		if plr ~= player then return end
 		if playerStatus[player.UserId] ~= "alive" then return end
@@ -180,13 +184,13 @@ Players.PlayerAdded:Connect(function(player)
 		end
 
 		if firstSpawn then
-			-- First spawn: freeze and show countdown
+			-- First spawn: freeze and show countdown.
 			firstSpawn = false
 			playerStatus[player.UserId] = "frozen"
 			freezePlayer(char)
 			evStartCountdown:FireClient(player)
 		else
-			-- Respawn after death
+			-- Respawn after death: resume immediately.
 			playerStatus[player.UserId] = "alive"
 			LeaderboardService.Respawn(player)
 			BonusService.ResetDebounce(player)
