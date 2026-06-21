@@ -52,6 +52,10 @@ Splitting logic into BridgeService / PlankService / BonusService / LeaderboardSe
 made it easy to reason about each system independently and avoid spaghetti
 between unrelated features.
 
+## Design Document
+
+The full game design — modes, leaderboard structure, save system, and UI flow — is documented in [DESIGN.md](./DESIGN.md).
+
 ## Tools & Workflow
 - [Rojo](https://rojo.space/) for VS Code ↔ Roblox Studio sync
 - Git + GitHub for version control
@@ -90,3 +94,5 @@ src/
 ```
 ## Play
 [Play on Roblox](https://www.roblox.com/games/97476080303924/Plank-Rush)
+
+
