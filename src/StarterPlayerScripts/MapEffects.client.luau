@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local remotes      = ReplicatedStorage:WaitForChild("Remotes")
 local evTrampoline = remotes:WaitForChild("TrampolineJump")
 
-local trampolines    = workspace:WaitForChild("Trampolines")
+local CollectionService = game:GetService("CollectionService")
 local ROTATION_SPEED = 20 -- degrees per second
 
 local rings = {}
@@ -21,10 +21,11 @@ local function registerTrampoline(part)
 	end
 end
 
-for _, part in ipairs(trampolines:GetChildren()) do
+-- Tag-based lookup: works regardless of where in the hierarchy the part lives
+for _, part in ipairs(CollectionService:GetTagged("Trampoline")) do
 	registerTrampoline(part)
 end
-trampolines.ChildAdded:Connect(registerTrampoline)
+CollectionService:GetInstanceAddedSignal("Trampoline"):Connect(registerTrampoline)
 
 RunService.RenderStepped:Connect(function(dt)
 	for _, ring in ipairs(rings) do
@@ -49,7 +50,7 @@ evTrampoline.OnClientEvent:Connect(function(jumperId)
 	local closest     = nil
 	local closestDist = math.huge
 
-	for _, part in ipairs(trampolines:GetChildren()) do
+	for _, part in ipairs(CollectionService:GetTagged("Trampoline")) do
 		if part:IsA("BasePart") then
 			local dist = (part.Position - root.Position).Magnitude
 			if dist < closestDist then

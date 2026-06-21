@@ -9,7 +9,7 @@ local BonusService = {}
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlankService      = require(script.Parent.PlankService)
 
-local bonusFolder = workspace:FindFirstChild("Bonuses")
+local CollectionService = game:GetService("CollectionService")
 local bonusEffect = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BonusEffect")
 
 local MAX_BONUS_DISTANCE = 8 -- studs, extra safety check on top of Touched
@@ -21,7 +21,6 @@ local function isPlayerNearPart(root, part)
 end
 
 function BonusService.Init(player, character, syncCallback)
-	if not bonusFolder then return end
 
 	debounce[player.UserId] = {}
 
@@ -30,7 +29,8 @@ function BonusService.Init(player, character, syncCallback)
 
 	local conn
 	conn = root.Touched:Connect(function(hit)
-		if not hit:IsDescendantOf(bonusFolder) then return end
+		-- Only respond to tagged bonus parts
+        if not CollectionService:HasTag(hit, "Bonus") then return end
 
 		local key = hit:GetFullName()
 		if debounce[player.UserId] and debounce[player.UserId][key] then return end

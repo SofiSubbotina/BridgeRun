@@ -10,7 +10,7 @@ local remotes      = ReplicatedStorage:WaitForChild("Remotes")
 local evTrampoline = remotes:WaitForChild("TrampolineJump")
 local evSound      = remotes:WaitForChild("PlaySound")
 
-local trampolines = workspace:WaitForChild("Trampolines")
+local CollectionService = game:GetService("CollectionService")
 local debounce    = {}
 
 local function setupTrampoline(part)
@@ -46,7 +46,8 @@ local function setupTrampoline(part)
 	end)
 end
 
-for _, part in ipairs(trampolines:GetChildren()) do
+-- Tag-based lookup: works regardless of where in the hierarchy the part lives
+for _, part in ipairs(CollectionService:GetTagged("Trampoline")) do
 	setupTrampoline(part)
 end
-trampolines.ChildAdded:Connect(setupTrampoline)
+CollectionService:GetInstanceAddedSignal("Trampoline"):Connect(setupTrampoline)
