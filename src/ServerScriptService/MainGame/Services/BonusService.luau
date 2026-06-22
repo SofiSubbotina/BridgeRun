@@ -8,6 +8,7 @@ local BonusService = {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PlankService      = require(script.Parent.PlankService)
+local LevelProgress = require(script.Parent.LevelProgress)
 
 local CollectionService = game:GetService("CollectionService")
 local bonusEffect = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BonusEffect")
@@ -35,6 +36,7 @@ function BonusService.Init(player, character, syncCallback)
 		local key = hit:GetFullName()
 		if debounce[player.UserId] and debounce[player.UserId][key] then return end
 		if not isPlayerNearPart(root, hit) then return end
+		if not LevelProgress.HasAccess(player, hit:GetAttribute("LevelId") or 1) then return end
 
 		if debounce[player.UserId] then
 			debounce[player.UserId][key] = true

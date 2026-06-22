@@ -10,6 +10,8 @@ local remotes      = ReplicatedStorage:WaitForChild("Remotes")
 local evTrampoline = remotes:WaitForChild("TrampolineJump")
 local evSound      = remotes:WaitForChild("PlaySound")
 
+local LevelProgress = require(game:GetService("ServerScriptService").MainGame.Services.LevelProgress)
+
 local CollectionService = game:GetService("CollectionService")
 local debounce    = {}
 
@@ -25,6 +27,7 @@ local function setupTrampoline(part)
 		local root     = character:FindFirstChild("HumanoidRootPart")
 		if not humanoid or not root then return end
 		if humanoid.Health <= 0 then return end
+		if not LevelProgress.HasAccess(player, part:GetAttribute("LevelId") or 1) then return end
 
 		debounce[player.UserId] = true
 
