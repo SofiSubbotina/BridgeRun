@@ -12,7 +12,7 @@ local PlankService      = require(script.Parent.PlankService)
 local CollectionService = game:GetService("CollectionService")
 local bonusEffect = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BonusEffect")
 
-local MAX_BONUS_DISTANCE = 8 -- studs, extra safety check on top of Touched
+local MAX_BONUS_DISTANCE = 12 -- studs, extra safety check on top of Touched
 
 local debounce = {}
 

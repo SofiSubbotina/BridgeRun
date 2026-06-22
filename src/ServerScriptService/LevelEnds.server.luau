@@ -12,6 +12,7 @@ local remotes         = ReplicatedStorage:WaitForChild("Remotes")
 local evLevelUnlocked = remotes:WaitForChild("LevelUnlocked")
 
 local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
+local BonusService = require(ServerScriptService.MainGame.Services.BonusService)
 
 -- Folder containing invisible trigger parts, each with a
 -- numeric "LevelId" attribute marking which level they end.
@@ -38,8 +39,11 @@ local function setupLevelEnd(part)
 
 		if LevelProgress.TryAdvance(player, levelId) then
 			evLevelUnlocked:FireClient(player, levelId + 1)
-		end
-	end)
+			task.delay(0.1, function()
+				BonusService.ResetDebounce(player)
+		end)
+	end
+end)
 end
 
 for _, part in ipairs(levelEnds:GetChildren()) do
