@@ -11,6 +11,7 @@ local BridgeService      = require(script.Services.BridgeService)
 local BonusService       = require(script.Services.BonusService)
 local LeaderboardService = require(script.Services.LeaderboardService)
 local CharacterLock      = require(script.Services.CharacterLock)
+local CollisionGroups = require(script.Services.CollisionGroups)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
@@ -174,6 +175,7 @@ Players.PlayerAdded:Connect(function(player)
 		end
 
 		setupCharacter(player, char)
+		CollisionGroups.Init(player, char)
 	end)
 
 	player.AncestryChanged:Connect(function()

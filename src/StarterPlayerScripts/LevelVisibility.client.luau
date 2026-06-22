@@ -24,6 +24,8 @@ local function applyVisibility(part, visible)
 		part.LocalTransparencyModifier = visible and 0 or 1
 	elseif part:IsA("SurfaceGui") or part:IsA("BillboardGui") then
 		part.Enabled = visible
+		elseif part:IsA("Decal") or part:IsA("Texture") then
+		part.Transparency = visible and 0 or 1
 	end
 end
 
