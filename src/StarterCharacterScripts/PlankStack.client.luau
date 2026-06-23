@@ -21,6 +21,8 @@ local evDied    = remotes:WaitForChild("PlayerDied")
 local evCollect = remotes:WaitForChild("PlankCollected")
 local evPlaced  = remotes:WaitForChild("PlankPlaced")
 
+local scattering = false
+
 local carryAnim = Instance.new("Animation")
 carryAnim.AnimationId = "rbxassetid://97938793322451"
 local carryTrack = animator:LoadAnimation(carryAnim)
@@ -98,6 +100,7 @@ local function startOtherStacksLoop()
 end
 
 local function clear()
+	scattering = false
 	for _, plank in ipairs(stack) do
 		if plank and plank.Parent then plank:Destroy() end
 	end
@@ -179,6 +182,7 @@ local function rebuild(count)
 	end
 	if not conn then
 		conn = RunService.RenderStepped:Connect(function()
+			if scattering then return end
 			if not stackAnchor or not stackAnchor.Parent then return end
 			if not hrp or not hrp.Parent then return end
 			for i, plank in ipairs(stack) do
@@ -311,6 +315,11 @@ end)
 
 evDied.OnClientEvent:Connect(function()
 	clear()
+end)
+
+local evWhirlpool = remotes:WaitForChild("WhirlpoolCatch")
+evWhirlpool.OnClientEvent:Connect(function()
+    scattering = true
 end)
 
 -- ── Lifecycle ─────────────────────────────────────────────────────────────
