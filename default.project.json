@@ -26,9 +26,9 @@
         "SpawnPersonalPlanks": { "$className": "RemoteEvent" },
         "StartCountdown":      { "$className": "RemoteEvent" },
         "PlayerReady":         { "$className": "RemoteEvent" },
-        "RunStarted":          { "$className": "RemoteEvent" },
         "TrampolineJump":      { "$className": "RemoteEvent" },
-        "LevelUnlocked":       { "$className": "RemoteEvent" }
+        "LevelUnlocked":       { "$className": "RemoteEvent" },
+        "WhirlpoolCatch":      { "$className": "RemoteEvent" }
       },
 
       "Clones": {
@@ -97,7 +97,10 @@
         },
         "LevelVisibility": {
           "$path": "src/StarterPlayerScripts/LevelVisibility.client.luau"
-        }
+        },
+        "WhirlpoolEffect": {
+    "$path": "src/StarterPlayerScripts/WhirlpoolEffect.client.luau"
+}
       }
     },
 

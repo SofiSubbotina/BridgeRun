@@ -320,6 +320,9 @@ end)
 local evWhirlpool = remotes:WaitForChild("WhirlpoolCatch")
 evWhirlpool.OnClientEvent:Connect(function()
     scattering = true
+	task.delay(3, function()
+        scattering = false
+	end)
 end)
 
 -- ── Lifecycle ─────────────────────────────────────────────────────────────

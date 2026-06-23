@@ -26,10 +26,9 @@ evCatch.OnClientEvent:Connect(function()
 		for _, w in ipairs(plank:GetChildren()) do
 			if w:IsA("WeldConstraint") then w:Destroy() end
 		end
-		plank.Parent     = workspace  -- убираем из character
+		plank.Parent     = workspace 
 		game:GetService("Debris"):AddItem(plank, 2)
 		plank.Anchored   = false
-		print("Plank moved to workspace, anchored:", plank.Anchored)
 		plank.CanCollide = true
 		plank.AssemblyLinearVelocity = Vector3.new(
 			math.random(-25, 25),
