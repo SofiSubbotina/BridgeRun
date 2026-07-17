@@ -1,4 +1,4 @@
---!strict
+--!nonstrict
 -- InteractablesManager.luau
 -- Finds all interactable objects by CollectionService tag and starts them.
 -- To add a new mechanic: create a module in Interactables/ and add one line here.

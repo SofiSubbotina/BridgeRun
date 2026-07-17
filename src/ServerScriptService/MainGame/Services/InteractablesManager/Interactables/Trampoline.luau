@@ -1,4 +1,4 @@
---!strict
+--!nonstrict
 -- Trampoline.luau
 -- One instance = one trampoline part in Workspace.
 -- Found by tag "Trampoline" via CollectionService in InteractablesManager.
@@ -7,13 +7,16 @@
 local Players       = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 
-local remotes      = game:GetService("ReplicatedStorage"):WaitForChild("Remotes")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris            = game:GetService("Debris")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
 local evTrampoline = remotes:WaitForChild("TrampolineJump")
 local evSound      = remotes:WaitForChild("PlaySound")
 
-local LevelProgress = require(
-	game:GetService("ServerScriptService").MainGame.Services.LevelProgress
-)
+local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -62,7 +65,7 @@ function Trampoline:_onTouch(hit: BasePart)
 	bv.MaxForce      = Vector3.new(math.huge, math.huge, math.huge)
 	bv.P             = math.huge
 	bv.Parent        = root
-	game:GetService("Debris"):AddItem(bv, BODYVELOCITY_TTL)
+	Debris:AddItem(bv, BODYVELOCITY_TTL)
 
 	-- Notify all clients so they can play the jump animation on the correct character
 	evTrampoline:FireAllClients(player.UserId)

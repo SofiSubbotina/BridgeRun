@@ -1,4 +1,4 @@
---!strict
+--!nonstrict
 -- SpikeTrap.luau
 -- One instance = one spike union in Workspace.
 -- Found by tag "SpikeTrap" via CollectionService in InteractablesManager.
@@ -7,7 +7,9 @@
 local TweenService = game:GetService("TweenService")
 local Players      = game:GetService("Players")
 
-local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
 local evDied  = remotes:WaitForChild("PlayerDied")
 local evSound = remotes:WaitForChild("PlaySound")
 
@@ -47,19 +49,9 @@ end
 -- Tweens the spike to an absolute CFrame target and waits until complete
 function SpikeTrap:_tweenTo(targetCFrame: CFrame, duration: number)
 	local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local completed = false
-
 	local tween = TweenService:Create(self._part, tweenInfo, { CFrame = targetCFrame })
-	tween.Completed:Connect(function()
-		completed = true
-	end)
 	tween:Play()
-
-	local elapsed = 0
-	while not completed do
-		elapsed += task.wait(0.05)
-		if elapsed > duration + 1 then break end
-	end
+	tween.Completed:Wait()
 end
 
 -- Kills the player whose body part touched the spike
@@ -96,7 +88,10 @@ function SpikeTrap:Start()
 
 	task.spawn(function()
 		-- Random start offset so spikes don't all fire at the same time
-		local offset = math.random(0, math.floor(PAUSE_TIME * 10)) / 10
+		-- Range covers full cycle, not just pause, so offsets spread out
+		-- across the whole period even when there are only a few traps.
+		local fullCycle = PAUSE_TIME + RISE_TIME + ACTIVE_TIME + SINK_TIME
+		local offset = math.random(0, math.floor(fullCycle * 10)) / 10
 		task.wait(offset)
 
 		while true do
