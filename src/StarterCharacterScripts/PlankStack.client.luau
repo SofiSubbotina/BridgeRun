@@ -100,12 +100,13 @@ local function startOtherStacksLoop()
 end
 
 local function clear()
-	scattering = false
+	if not scattering then
 	for _, plank in ipairs(stack) do
 		if plank and plank.Parent then plank:Destroy() end
 	end
+end
+    scattering = false
 	stack      = {}
-	stackCount = 0
 	if conn then conn:Disconnect(); conn = nil end
 	carryTrack:Stop()
 	if motor and motor.Parent then motor:Destroy() end

@@ -12,10 +12,11 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local evDied  = remotes:WaitForChild("PlayerDied")
 local evSound = remotes:WaitForChild("PlaySound")
+local evScatter = remotes:WaitForChild("WhirlpoolCatch")
+
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
-local WARN_TIME   = 1.0  -- sec: spike is below ground, about to rise
 local RISE_TIME   = 0.3  -- sec: spike rises to full height
 local ACTIVE_TIME = 1.5  -- sec: spike is up and kills on touch
 local SINK_TIME   = 0.3  -- sec: spike retracts underground
@@ -70,6 +71,7 @@ function SpikeTrap:_onTouch(hit: BasePart)
 
 	self._hit[character] = true
 
+	evScatter:FireClient(player)
 	evDied:FireClient(player)
 	evSound:FireClient(player, "DrownSound")
 	task.delay(0.1, function()

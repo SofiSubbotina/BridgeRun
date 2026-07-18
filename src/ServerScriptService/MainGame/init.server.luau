@@ -17,6 +17,7 @@ local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
 local evCollect        = remotes:WaitForChild("PlankCollected")
 local evDied           = remotes:WaitForChild("PlayerDied")
+local evScatterPlanks = remotes:WaitForChild("WhirlpoolCatch")
 local evSound          = remotes:WaitForChild("PlaySound")
 local evSpawnPlanks    = remotes:WaitForChild("SpawnPersonalPlanks")
 local evPickup         = remotes:WaitForChild("PlankPickedUp")
@@ -56,11 +57,11 @@ end
 
 local function handleDrown(player, character, humanoid, conn)
 	playerStatus[player.UserId] = "dead"
-
+    
 	BridgeService.DrownPlayer(player)
+	evScatterPlanks:FireClient(player)
 	evDied:FireClient(player)
 	evSound:FireClient(player, "DrownSound")
-	LeaderboardService.AddAttempt(player)
 
 	task.delay(CONFIG.DROWN_DELAY, function()
 		if humanoid.Health > 0 then humanoid.Health = 0 end
@@ -78,6 +79,9 @@ local function setupCharacter(player, character)
 
 	local root     = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:WaitForChild("Humanoid")
+	humanoid.Died:Connect(function()
+	LeaderboardService.AddAttempt(player)
+end)
 
 	BridgeService.FullCleanup(player)
 	BridgeService.Init(player, root)
