@@ -100,7 +100,10 @@
         },
         "WhirlpoolEffect": {
     "$path": "src/StarterPlayerScripts/WhirlpoolEffect.client.luau"
-}
+},
+"LevelTransitionEffect": {
+          "$path": "src/StarterPlayerScripts/LevelTransitionEffect.client.luau"
+        }
       }
     },
 
