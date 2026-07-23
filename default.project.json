@@ -99,7 +99,7 @@
           "$path": "src/StarterPlayerScripts/LevelVisibility.client.luau"
         },
         "WhirlpoolEffect": {
-    "$path": "src/StarterPlayerScripts/WhirlpoolEffect.client.luau"
+    "$path": "src/StarterPlayerScripts/PlankScatterEffect.client.luau"
 },
 "LevelTransitionEffect": {
           "$path": "src/StarterPlayerScripts/LevelTransitionEffect.client.luau"
