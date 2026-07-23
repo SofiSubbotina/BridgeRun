@@ -1,5 +1,7 @@
--- WhirlpoolEffect.client.luau
--- Scatter planks when the local player is caught by a whirlpool.
+-- PlankScatterEffect.client.luau
+-- Scatters carried planks on any death (whirlpool, spikes, drowning, etc).
+-- Triggered by the WhirlpoolCatch remote, reused as a generic "scatter" signal —
+-- name kept for backwards compatibility, not because it's whirlpool-only anymore.
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
