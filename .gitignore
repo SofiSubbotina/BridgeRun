@@ -5,3 +5,4 @@ default.place.xml
 *.rbxl.lock
 node_modules/
 sourcemap.json
+src/ReplicatedStorage/DevConfig.luau

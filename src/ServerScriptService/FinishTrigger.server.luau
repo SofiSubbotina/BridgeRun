@@ -12,6 +12,7 @@ local PlankService       = require(ServerScriptService.MainGame.Services.PlankSe
 local BridgeService      = require(ServerScriptService.MainGame.Services.BridgeService)
 local LeaderboardService = require(ServerScriptService.MainGame.Services.LeaderboardService)
 local CharacterLock = require(ServerScriptService.MainGame.Services.CharacterLock)
+local AnalyticsService = require(ServerScriptService.MainGame.Services.AnalyticsService)
 
 local finish = workspace:WaitForChild("Finish"):WaitForChild("FinishPart")
 
@@ -42,6 +43,8 @@ finish.Touched:Connect(function(hit)
 		finished[player.UserId] = nil
 		return
 	end
+
+	AnalyticsService.RecordFinish(player, elapsed)
 
 	local humanoid = character:FindFirstChild("Humanoid")
 	local root     = character:FindFirstChild("HumanoidRootPart")

@@ -10,6 +10,10 @@
         "$path": "src/ReplicatedStorage/CountdownState.luau"
       },
 
+      "DevConfig": {
+        "$path": "src/ReplicatedStorage/DevConfig.luau"
+      },
+
       "Remotes": {
         "$className": "Folder",
         "BonusEffect":         { "$className": "RemoteEvent" },
@@ -28,7 +32,8 @@
         "PlayerReady":         { "$className": "RemoteEvent" },
         "TrampolineJump":      { "$className": "RemoteEvent" },
         "LevelUnlocked":       { "$className": "RemoteEvent" },
-        "WhirlpoolCatch":      { "$className": "RemoteEvent" }
+        "WhirlpoolCatch":      { "$className": "RemoteEvent" },
+        "GetAnalytics":        { "$className": "RemoteFunction" }
       },
 
       "Clones": {
@@ -38,6 +43,10 @@
 
     "ServerScriptService": {
       "$className": "ServerScriptService",
+
+      "AnalyticsAdmin": {
+        "$path": "src/ServerScriptService/AnalyticsAdmin.server.luau"
+      },
 
       "FinishTrigger": {
         "$path": "src/ServerScriptService/FinishTrigger.server.luau"
@@ -109,6 +118,14 @@
 
     "StarterGui": {
       "$className": "StarterGui",
+
+     "AdminAnalyticsGui": {
+        "$className": "ScreenGui",
+        "$properties": { "ResetOnSpawn": false },
+        "AdminGuiLocal": {
+         "$path": "src/StarterGui/AdminAnalyticsGui/AdminGuiLocal.client.luau"
+       }
+     },
 
       "CountdownGui": {
         "$className": "ScreenGui",
