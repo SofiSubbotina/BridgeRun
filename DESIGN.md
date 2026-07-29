@@ -1,7 +1,7 @@
 # Plank Rush — Design Document
 
 ## Current Status
-Two levels in development. Implemented: plank counter, global top-10 leaderboard, live run timer, finish screen with personal best and attempt count, level progression system, whirlpool hazards, level visibility tied to progress.
+Two levels in development. Implemented: plank counter, a persistent global leaderboard (DataStore + OrderedDataStore, top 10), live run timer, finish screen with personal best and attempt count, level progression system, environmental hazards (whirlpools, geysers, spike traps), level visibility tied to progress.
 
 ## Game Modes
 
@@ -67,7 +67,7 @@ Stickers are awarded for completing each level. Details TBD.
 ## Development Priorities
 1. New levels — content first
 2. Per-level leaderboards
-3. Save system and global leaderboard
+3. Save system and global leaderboard — flat leaderboard + persistence done; per-mode saves still pending
 4. Main lobby and level journal
 5. Mobile UI adaptation
 6. Stickers
