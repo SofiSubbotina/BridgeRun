@@ -4,7 +4,6 @@
 
 local AnalyticsService = {}
 
-local Players            = game:GetService("Players")
 local DataStoreService    = game:GetService("DataStoreService")
 local LocalizationService = game:GetService("LocalizationService")
 
@@ -84,6 +83,8 @@ function AnalyticsService.Save(player)
 
 	d.durationSeconds = os.time() - d.joinTime
 	d.region          = getRegion(player)
+	d.date            = os.date("!%Y-%m-%d %H:%M", d.joinTime) 
+	d.joinedAt        = d.joinTime 
 	d.joinTime        = nil -- not needed in the stored record itself
 
 	local key = CONFIG.KEY_PREFIX .. player.UserId .. "_" .. os.time()

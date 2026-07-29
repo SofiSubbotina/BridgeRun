@@ -37,6 +37,7 @@ local function clearRows()
 end
 
 local function fillRow(row, data)
+	row.DateLabel.Text     = data.date or "?"
 	row.NameLabel.Text     = data.name or "?"
 	row.DurationLabel.Text = tostring(data.durationSeconds or 0) .. "s"
 	row.AttemptsLabel.Text = tostring(data.attempts or 0)
@@ -61,6 +62,8 @@ local function refresh()
 end
 
 refreshButton.MouseButton1Click:Connect(refresh)
+
+task.defer(refresh)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
