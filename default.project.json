@@ -44,6 +44,10 @@
     "ServerScriptService": {
       "$className": "ServerScriptService",
 
+      "WhirlpoolManager": {
+        "$path": "src/ServerScriptService/WhirlpoolManager.server.luau"
+     },
+
       "AnalyticsAdmin": {
         "$path": "src/ServerScriptService/AnalyticsAdmin.server.luau"
       },
