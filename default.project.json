@@ -93,6 +93,9 @@
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
 
+        "MapEffectsManager": {
+          "$path": "src/StarterPlayerScripts/MapEffectsManager"
+        },
         "BonusEffectClient": {
           "$path": "src/StarterPlayerScripts/BonusEffectClient.client.luau"
         },
@@ -104,9 +107,6 @@
         },
         "DrownEffect": {
           "$path": "src/StarterPlayerScripts/DrownEffect.client.luau"
-        },
-        "MapEffects": {
-          "$path": "src/StarterPlayerScripts/MapEffects.client.luau"
         },
         "LevelVisibility": {
           "$path": "src/StarterPlayerScripts/LevelVisibility.client.luau"
