@@ -10,6 +10,7 @@ local RunService        = game:GetService("RunService")
 
 local PlankService = require(script.Parent.PlankService)
 local CurrentZones  = require(script.Parent.CurrentZones)
+local PlankPool     = require(script.Parent.PlankPool)
 
 local clones           = ReplicatedStorage:WaitForChild("Clones")
 local plankTemplate    = clones:WaitForChild("PlankModel")
@@ -37,11 +38,7 @@ local CONFIG = {
 	LOOK_OFFSET  = 2.6,
 	FADE_DELAY   = 1.5,
 	RETURN_DELAY = 2,
-	POOL_SIZE    = 100, -- Enough for the entire run
-	POOL_BATCH   = 20,  -- Clone() operations per frame during warmup
 }
-
-local pools  = {}
 local placed = {}
 
 -- ── IsOnWater Cache ────────────────────────────────────────────────────────
@@ -54,113 +51,6 @@ local WATER_CACHE_FRAMES = 3
 RunService.Heartbeat:Connect(function()
 	frameCount = frameCount + 1
 end)
-
--- ── Plank Pool ─────────────────────────────────────────────────────────────
-
--- Creates the pool in batches of POOL_BATCH per frame.
--- Prevents server lag during spawning by spreading out Clone() calls:
--- 20 per frame instead of 100 in a single synchronous operation.
--- onReady() is called when the entire pool is prepared.
-local function createPool(player, onReady)
-	local pool = { free = {}, active = {}, ready = false }
-	pools[player.UserId] = pool
-
-	local done = 0
-
-	local function nextBatch()
-		if not pools[player.UserId] then return end
-
-		for _ = 1, CONFIG.POOL_BATCH do
-			done = done + 1
-			if done > CONFIG.POOL_SIZE then
-				pool.ready = true
-				if onReady then onReady() end
-				return
-			end
-
-			local p = plankTemplate:Clone()
-			p.Anchored     = true
-			p.CanCollide   = false
-			p.CanTouch     = false
-			p.CFrame       = CFrame.new(0, -500, 0)
-			p.Transparency = 1
-			p.Parent       = placedFolder
-			table.insert(pool.free, p)
-		end
-
-		task.defer(nextBatch)
-	end
-
-	task.defer(nextBatch)
-end
-
-local function acquirePlank(player, cf)
-	local pool = pools[player.UserId]
-	if not pool or #pool.free == 0 then
-		if pool and pool.ready then
-			warn("[BridgeService] Pool is empty for", player.Name, "- increase POOL_SIZE")
-		end
-		return nil
-	end
-
-	local p = table.remove(pool.free)
-	table.insert(pool.active, p)
-
-	p.CFrame       = cf
-	p.Transparency = 0
-
-	return p
-end
-
-local function releasePlank(player, plank)
-	local pool = pools[player.UserId]
-
-	if not pool then
-		if plank and plank.Parent then
-			plank:Destroy()
-		end
-		return
-	end
-
-	for i, p in ipairs(pool.active) do
-		if p == plank then
-			table.remove(pool.active, i)
-			break
-		end
-	end
-
-	-- A plank caught by a current may still be unanchored/collidable and
-	-- carrying velocity at this point — always reset it to the pool's
-	-- resting state, regardless of what a current zone did to it.
-	plank.Anchored               = true
-	plank.CanCollide             = false
-	plank.AssemblyLinearVelocity = Vector3.zero
-	plank.CFrame       = CFrame.new(0, -500, 0)
-	plank.Transparency = 1
-
-	table.insert(pool.free, plank)
-end
-
-local function destroyPool(player)
-	local pool = pools[player.UserId]
-	if not pool then return end
-
-	pool.ready = false
-
-	for _, p in ipairs(pool.free) do
-		if p and p.Parent then
-			p:Destroy()
-		end
-	end
-
-	for _, p in ipairs(pool.active) do
-		if p and p.Parent then
-			p:Destroy()
-		end
-	end
-
-	pools[player.UserId] = nil
-end
 
 -- ── Public Functions ───────────────────────────────────────────────────────
 
@@ -178,7 +68,7 @@ function BridgeService.Init(player, root)
 		collider = col,
 	}
 
-	createPool(player)
+	PlankPool.Create(player.UserId, plankTemplate, placedFolder)
 end
 
 function BridgeService.IsOnWater(root, character)
@@ -218,12 +108,10 @@ function BridgeService.PlacePlank(player, root)
 	local d = placed[player.UserId]
 	if not d then return false end
 
-	local pool = pools[player.UserId]
-
 	-- Pool is still warming up.
 	-- Do not kill the player; simply skip placement.
 	-- In practice the player is frozen by the countdown at this stage.
-	if not pool or not pool.ready then
+	if not PlankPool.IsReady(player.UserId) then
 		return true
 	end
 
@@ -248,7 +136,7 @@ function BridgeService.PlacePlank(player, root)
 	local angle = math.atan2(look.X, look.Z)
 	local cf = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 
-	local p = acquirePlank(player, cf)
+	local p = PlankPool.Acquire(player.UserId, cf, player.Name)
 
 	if not p then
 		return true -- Pool is empty, do not kill the player
@@ -279,7 +167,7 @@ function BridgeService.PlacePlank(player, root)
 			end
 		end
 
-		releasePlank(player, p)
+		PlankPool.Release(player.UserId, p)
 	end)
 
 	PlankService.Add(player, -1)
@@ -309,7 +197,7 @@ function BridgeService.Cleanup(player)
 	if not d then return end
 
 	for _, p in ipairs(d.parts) do
-		releasePlank(player, p)
+		PlankPool.Release(player.UserId, p)
 	end
 
 	d.parts = {}
@@ -334,7 +222,7 @@ function BridgeService.FullCleanup(player)
 
 	placed[player.UserId] = nil
 
-	destroyPool(player)
+	PlankPool.Destroy(player.UserId)
 end
 
 return BridgeService
