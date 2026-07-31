@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 
 local PlankService = require(script.Parent.PlankService)
+local CurrentZones  = require(script.Parent.CurrentZones)
 
 local clones           = ReplicatedStorage:WaitForChild("Clones")
 local plankTemplate    = clones:WaitForChild("PlankModel")
@@ -128,6 +129,12 @@ local function releasePlank(player, plank)
 		end
 	end
 
+	-- A plank caught by a current may still be unanchored/collidable and
+	-- carrying velocity at this point — always reset it to the pool's
+	-- resting state, regardless of what a current zone did to it.
+	plank.Anchored               = true
+	plank.CanCollide             = false
+	plank.AssemblyLinearVelocity = Vector3.zero
 	plank.CFrame       = CFrame.new(0, -500, 0)
 	plank.Transparency = 1
 
@@ -245,6 +252,13 @@ function BridgeService.PlacePlank(player, root)
 
 	if not p then
 		return true -- Pool is empty, do not kill the player
+	end
+
+	-- Dropped inside a current zone: let physics carry the plank the same
+	-- way it carries the player, instead of it staying anchored in place.
+	if CurrentZones.Find(pos) then
+		p.Anchored   = false
+		p.CanCollide = true
 	end
 
 	table.insert(d.parts, p)
