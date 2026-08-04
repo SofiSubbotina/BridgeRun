@@ -22,7 +22,9 @@ local RunService        = game:GetService("RunService")
 local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players        = game:GetService("Players")
-local whirlpoolCatch = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("WhirlpoolCatch")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local PlankPenalty = require(ServerScriptService.MainGame.Services.PlankPenalty)
 
 local Whirlpool = {}
 Whirlpool.__index = Whirlpool
@@ -202,7 +204,7 @@ function Whirlpool._catchCharacter(self: Whirlpool, character: Model)
 	pullTween.Completed:Connect(function()
 		local player = Players:GetPlayerFromCharacter(character)
     if player then
-        whirlpoolCatch:FireClient(player)
+        PlankPenalty.ScatterOnDeath(player)
     end
 		if humanoid.Parent and humanoid.Health > 0 then
 			humanoid.Health = 0

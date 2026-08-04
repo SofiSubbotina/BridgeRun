@@ -8,12 +8,14 @@ local TweenService = game:GetService("TweenService")
 local Players      = game:GetService("Players")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local PlankPenalty = require(ServerScriptService.MainGame.Services.PlankPenalty)
+
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local evDied  = remotes:WaitForChild("PlayerDied")
 local evSound = remotes:WaitForChild("PlaySound")
-local evScatter = remotes:WaitForChild("WhirlpoolCatch")
-
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -71,7 +73,7 @@ function SpikeTrap:_onTouch(hit: BasePart)
 
 	self._hit[character] = true
 
-	evScatter:FireClient(player)
+	PlankPenalty.ScatterOnDeath(player)
 	evDied:FireClient(player)
 	evSound:FireClient(player, "DrownSound")
 	task.delay(0.1, function()
