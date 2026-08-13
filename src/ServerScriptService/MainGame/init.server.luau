@@ -13,12 +13,12 @@ local LeaderboardService = require(script.Services.LeaderboardService)
 local CharacterLock      = require(script.Services.CharacterLock)
 local CollisionGroups = require(script.Services.CollisionGroups)
 local AnalyticsService = require(script.Services.AnalyticsService)
+local PlankPenalty       = require(script.Services.PlankPenalty)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
 local evCollect        = remotes:WaitForChild("PlankCollected")
 local evDied           = remotes:WaitForChild("PlayerDied")
-local evScatterPlanks = remotes:WaitForChild("WhirlpoolCatch")
 local evSound          = remotes:WaitForChild("PlaySound")
 local evSpawnPlanks    = remotes:WaitForChild("SpawnPersonalPlanks")
 local evPickup         = remotes:WaitForChild("PlankPickedUp")
@@ -60,7 +60,7 @@ local function handleDrown(player, character, humanoid, conn)
 	playerStatus[player.UserId] = "dead"
     
 	BridgeService.DrownPlayer(player)
-	evScatterPlanks:FireClient(player)
+	PlankPenalty.ScatterOnDeath(player)
 	evDied:FireClient(player)
 	evSound:FireClient(player, "DrownSound")
 

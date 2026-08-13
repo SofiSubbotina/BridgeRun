@@ -11,6 +11,7 @@ local REGISTRY = {
 	{ tag = "SpikeTrap",  module = require(Interactables.SpikeTrap)  },
 	{ tag = "Trampoline", module = require(Interactables.Trampoline) },
 	{ tag = "Geyser",    module = require(Interactables.Geyser)    },
+	{ tag = "SpinningLog",  module = require(Interactables.SpinningLog)  },
 	-- { tag = "Current",   module = require(Interactables.Current)   },
 }
 
