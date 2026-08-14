@@ -1,5 +1,5 @@
 -- LeaderboardService
--- Tracks active runs, personal records, and the global top-10.
+-- Tracks active runs, personal records, and the global top.
 -- Saves records via an async queue with exponential backoff retry.
 
 local LeaderboardService = {}
@@ -16,7 +16,7 @@ local orderedStore = DataStoreService:GetOrderedDataStore("BestTimes_v1")
 
 local current   = {}
 local records   = {}
-local top10Cache = {}
+local topCache = {}
 
 local CONFIG = {
 	TOP_COUNT    = 10,  -- how many places in the top
@@ -29,7 +29,7 @@ local CONFIG = {
 local saveQueue  = {}   -- { userId, attempt }
 local isSaving   = false
 
-local refreshTop10
+local refreshTop
 
 local function processSaveQueue()
 	if isSaving then return end
@@ -81,7 +81,7 @@ local function processSaveQueue()
 		if not okOrd then
 			warn("[LeaderboardService] OrderedDataStore не обновлён:", errOrd)
 		else
-			task.defer(refreshTop10)
+			task.defer(refreshTop)
 		end
 	end
 
@@ -94,15 +94,15 @@ local function queueSave(player)
 	processSaveQueue()
 end
 
--- ── Top 10 ────────────────────────────────────────────────────────────────
+-- ── Top ────────────────────────────────────────────────────────────────
 
 local isRefreshing  = false
 local needsRefresh  = false
 
 -- Protection against request spam:
--- if refreshTop10 is already running,
+-- if refreshTop is already running,
 -- simply mark that another refresh is needed after completion.
-refreshTop10 = function(attempt)
+refreshTop = function(attempt)
 	if isRefreshing then
 		needsRefresh = true
 		return
@@ -118,11 +118,11 @@ refreshTop10 = function(attempt)
 	end)
 
 	if not ok then
-		warn("[LeaderboardService] Топ-10 не загружен, попытка", attempt, ":", result)
+		warn("[LeaderboardService] Топ не загружен, попытка", attempt, ":", result)
 		if attempt < CONFIG.MAX_RETRIES then
 			task.delay(2 ^ attempt, function()
 				isRefreshing = false
-				refreshTop10(attempt + 1)
+				refreshTop(attempt + 1)
 			end)
 			return
 		end
@@ -130,7 +130,7 @@ refreshTop10 = function(attempt)
 		return
 	end
 
-	top10Cache = {}
+	topCache = {}
 	for _, entry in ipairs(result) do
 		local userId = tonumber(entry.key)
 		local timeMs = entry.value
@@ -143,7 +143,7 @@ refreshTop10 = function(attempt)
 			name = nameOk and fetchedName or "???"
 		end
 
-		table.insert(top10Cache, {
+		table.insert(topCache, {
 			name     = name,
 			bestTime = timeMs / 1000,
 		})
@@ -153,7 +153,7 @@ refreshTop10 = function(attempt)
 	isRefreshing = false
 
 	if needsRefresh then
-		task.defer(refreshTop10)
+		task.defer(refreshTop)
 	end
 end
 
@@ -194,7 +194,7 @@ end
 
 function LeaderboardService.Broadcast()
 	evLeaderboard:FireAllClients({
-		top10      = top10Cache, 
+		top      = topCache, 
 		active     = getActive(),
 		serverTime = tick(),
 	})
@@ -274,7 +274,7 @@ function LeaderboardService.Remove(player)
 	LeaderboardService.Broadcast()
 end
 
-task.defer(refreshTop10)
+task.defer(refreshTop)
 
 game:BindToClose(function()
 	for userId, rec in pairs(records) do

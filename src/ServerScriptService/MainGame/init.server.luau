@@ -198,6 +198,7 @@ Players.PlayerRemoving:Connect(function(player)
 	pickupDebounce[player.UserId] = nil
 	BridgeService.FullCleanup(player)
 	PlankService.Cleanup(player)
+	BonusService.Cleanup(player)
 	LeaderboardService.Remove(player)
 	AnalyticsService.Save(player)
 end)

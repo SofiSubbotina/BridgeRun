@@ -10,7 +10,7 @@ local evLeaderboard = remotes:WaitForChild("LeaderboardUpdate")
 
 local gui        = script.Parent
 local panel      = gui:WaitForChild("Panel")
-local top10List  = panel:WaitForChild("Top5List")
+local topList  = panel:WaitForChild("Top5List")
 local activeList = panel:WaitForChild("ActiveList")
 
 -- ── Type definitions ──────────────────────────────────────────────────────
@@ -24,13 +24,13 @@ type LeaderboardEntry = {
 }
 type LeaderboardData = {
 	active:     { LeaderboardEntry },  -- all players currently in a run
-	top10:      { LeaderboardEntry },  -- all-time top 10 from OrderedDataStore
+	top:      { LeaderboardEntry },  -- all-time top 10 from OrderedDataStore
 	serverTime: number,                -- server tick() at broadcast time (for clock sync)
 }
 
 -- Initialised with empty arrays so Heartbeat guard `lastData.active` is safe
 -- before the first server broadcast arrives.
-local lastData: LeaderboardData = { active = {}, top10 = {}, serverTime = 0 }
+local lastData: LeaderboardData = { active = {}, top = {}, serverTime = 0 }
 
 -- Stores per-player timer state so the Heartbeat loop can interpolate live times.
 local activeTimer = {}
@@ -128,13 +128,13 @@ local function updateLeaderboard(data: LeaderboardData)
 		end
 	end
 
-	ensureLayout(top10List)
+	ensureLayout(topList)
 	ensureLayout(activeList)
 
 	-- Rebuild top-10 panel
-	clearList(top10List)
-	if #data.top10 == 0 then
-		local empty = Instance.new("TextLabel", top10List)
+	clearList(topList)
+	if #data.top == 0 then
+		local empty = Instance.new("TextLabel", topList)
 		empty.Size                   = UDim2.new(1, 0, 0, 20)
 		empty.BackgroundTransparency = 1
 		empty.Text                   = "No records yet"
@@ -142,8 +142,8 @@ local function updateLeaderboard(data: LeaderboardData)
 		empty.Font                   = Enum.Font.Gotham
 		empty.TextSize               = 10
 	else
-		for i, entry in ipairs(data.top10) do
-			makeRow(top10List, i, entry.name,
+		for i, entry in ipairs(data.top) do
+			makeRow(topList, i, entry.name,
 				formatTime(entry.bestTime),
 				Color3.fromRGB(100, 255, 120),
 				i == 1
