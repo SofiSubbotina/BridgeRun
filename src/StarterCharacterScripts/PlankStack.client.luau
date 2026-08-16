@@ -9,6 +9,7 @@ local TweenService      = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player    = Players.LocalPlayer
+local Registry = require(player:WaitForChild("PlayerScripts"):WaitForChild("Modules"):WaitForChild("PlankVisualsRegistry"))
 local character = script.Parent
 local humanoid  = character:WaitForChild("Humanoid")
 local hrp       = character:WaitForChild("HumanoidRootPart")
@@ -20,8 +21,6 @@ local evUpdate  = remotes:WaitForChild("PlankUpdate")
 local evDied    = remotes:WaitForChild("PlayerDied")
 local evCollect = remotes:WaitForChild("PlankCollected")
 local evPlaced  = remotes:WaitForChild("PlankPlaced")
-
-local scattering = false
 
 local carryAnim = Instance.new("Animation")
 carryAnim.AnimationId = "rbxassetid://97938793322451"
@@ -40,6 +39,8 @@ local stackCount  = 0
 local conn        = nil
 local stackAnchor = nil
 local motor       = nil
+
+Registry.Register(player.UserId, function() return stack end)
 
 local otherStacks     = {}
 local otherStacksConn = nil
@@ -100,12 +101,11 @@ local function startOtherStacksLoop()
 end
 
 local function clear()
-	if not scattering then
+	if not Registry.IsScattering(player.UserId) then
 	for _, plank in ipairs(stack) do
 		if plank and plank.Parent then plank:Destroy() end
 	end
 end
-    scattering = false
 	stack      = {}
 	if conn then conn:Disconnect(); conn = nil end
 	carryTrack:Stop()
@@ -183,7 +183,7 @@ local function rebuild(count)
 	end
 	if not conn then
 		conn = RunService.RenderStepped:Connect(function()
-			if scattering then return end
+			if Registry.IsScattering(player.UserId) then return end
 			if not stackAnchor or not stackAnchor.Parent then return end
 			if not hrp or not hrp.Parent then return end
 			for i, plank in ipairs(stack) do
@@ -236,6 +236,7 @@ local function animatePlankThrow(angle)
 end
 
 local function clearOtherStack(userId)
+	if Registry.IsScattering(userId) then return end
 	local data = otherStacks[userId]
 	if not data then return end
 	for _, p in ipairs(data.stack) do
@@ -244,6 +245,7 @@ local function clearOtherStack(userId)
 	if data.anchor and data.anchor.Parent then data.anchor:Destroy() end
 	if data.motor and data.motor.Parent then data.motor:Destroy() end
 	otherStacks[userId] = nil
+	Registry.Unregister(userId)
 end
 
 local function updateOtherStack(userId, count)
@@ -251,6 +253,7 @@ local function updateOtherStack(userId, count)
 	if not otherPlayer then return end
 	local char = otherPlayer.Character
 	if not char then return end
+	if Registry.IsScattering(userId) then return end
 
 	local visual = math.min(count, MAX_VISUAL)
 
@@ -265,6 +268,9 @@ local function updateOtherStack(userId, count)
 		local anchor, mot = createAnchor(char)
 		otherStacks[userId] = { stack = {}, anchor = anchor, motor = mot }
 		data = otherStacks[userId]
+		Registry.Register(userId, function() -- added block
+			return otherStacks[userId] and otherStacks[userId].stack or {}
+		end)
 	end
 
 	-- Anchor belongs to old character (after respawn) — rebuild
@@ -319,10 +325,10 @@ evDied.OnClientEvent:Connect(function()
 end)
 
 local evWhirlpool = remotes:WaitForChild("WhirlpoolCatch")
-evWhirlpool.OnClientEvent:Connect(function()
-    scattering = true
+evWhirlpool.OnClientEvent:Connect(function(userId: number)
+    Registry.SetScattering(userId, true)
 	task.delay(3, function()
-        scattering = false
+        Registry.SetScattering(userId, false) 
 	end)
 end)
 

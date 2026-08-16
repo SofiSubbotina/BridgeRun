@@ -111,10 +111,16 @@
         "LevelVisibility": {
           "$path": "src/StarterPlayerScripts/LevelVisibility.client.luau"
         },
-        "WhirlpoolEffect": {
-    "$path": "src/StarterPlayerScripts/PlankScatterEffect.client.luau"
-},
-"LevelTransitionEffect": {
+        "PlankScatterEffect": {
+          "$path": "src/StarterPlayerScripts/PlankScatterEffect.client.luau"
+       },
+      "Modules": {
+    "$className": "Folder",
+    "PlankVisualsRegistry": {
+        "$path": "src/StarterPlayerScripts/Modules/PlankVisualsRegistry.luau"
+    }
+       },
+        "LevelTransitionEffect": {
           "$path": "src/StarterPlayerScripts/LevelTransitionEffect.client.luau"
         }
       }

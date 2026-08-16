@@ -1,35 +1,33 @@
+--!strict
 -- PlankScatterEffect.client.luau
 -- Scatters carried planks on any death (whirlpool, spikes, drowning, etc).
 -- Triggered by the WhirlpoolCatch remote, reused as a generic "scatter" signal —
 -- name kept for backwards compatibility, not because it's whirlpool-only anymore.
+-- Fires for EVERY client (server uses FireAllClients), so this also plays the
+-- effect for other players' characters, not just the local one. Which Parts
+-- belong to which player is resolved via PlankVisualsRegistry, not by reading
+-- Character children directly.
 
-local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris            = game:GetService("Debris")
 
-local player   = Players.LocalPlayer
-local remotes  = ReplicatedStorage:WaitForChild("Remotes")
-local evCatch  = remotes:WaitForChild("WhirlpoolCatch")
-local template = ReplicatedStorage:WaitForChild("Clones"):WaitForChild("PlankModel")
+local Registry = require(script.Parent:WaitForChild("Modules"):WaitForChild("PlankVisualsRegistry"))
 
-evCatch.OnClientEvent:Connect(function()
-	local character = player.Character
-	if not character then return end
-	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local evCatch = remotes:WaitForChild("WhirlpoolCatch")
 
-	local planks = {}
-	for _, part in ipairs(character:GetChildren()) do
-		if part:IsA("BasePart") and part.Name == template.Name then
-			table.insert(planks, part)
-		end
-	end
+evCatch.OnClientEvent:Connect(function(userId: number)
+	local planks = Registry.GetPlanks(userId)
 
 	for _, plank in ipairs(planks) do
+		if not plank or not plank.Parent then continue end
+
 		for _, w in ipairs(plank:GetChildren()) do
 			if w:IsA("WeldConstraint") then w:Destroy() end
 		end
-		plank.Parent     = workspace 
-		game:GetService("Debris"):AddItem(plank, 2)
+
+		plank.Parent     = workspace
+		Debris:AddItem(plank, 2)
 		plank.Anchored   = false
 		plank.CanCollide = true
 		plank.AssemblyLinearVelocity = Vector3.new(

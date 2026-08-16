@@ -32,7 +32,7 @@ local PlankPenalty = {}
 -- is told the truth about it a moment later — not a hardcoded 0, in case the
 -- player already picked up a new plank during the delay.
 function PlankPenalty.Scatter(player: Player, soundName: string?)
-	evScatter:FireClient(player)
+	evScatter:FireAllClients(player.UserId)
 	evSound:FireClient(player, soundName or "PenaltySound")
 
 	PlankService.Reset(player)
@@ -44,7 +44,7 @@ end
 
 -- Lethal: no server-side reset needed, PlankService.Init on respawn handles it.
 function PlankPenalty.ScatterOnDeath(player: Player)
-	evScatter:FireClient(player)
+	evScatter:FireAllClients(player.UserId)
 end
 
 return PlankPenalty
