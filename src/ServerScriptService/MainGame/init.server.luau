@@ -14,6 +14,7 @@ local CharacterLock      = require(script.Services.CharacterLock)
 local CollisionGroups = require(script.Services.CollisionGroups)
 local AnalyticsService = require(script.Services.AnalyticsService)
 local PlankPenalty       = require(script.Services.PlankPenalty)
+local PlayerStatus       = require(script.Services.PlayerStatus)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
@@ -48,7 +49,6 @@ local CONFIG = {
 	PICKUP_COOLDOWN    = 0.3,  -- minimum seconds between plank pickup events
 }
 
-local playerStatus   = {} -- "frozen" | "alive" | "dead"
 local lastStep       = {}
 local pickupDebounce = {}
 
@@ -57,7 +57,6 @@ local function syncPlanks(player)
 end
 
 local function handleDrown(player, character, humanoid, conn)
-	playerStatus[player.UserId] = "dead"
     
 	BridgeService.DrownPlayer(player)
 	PlankPenalty.ScatterOnDeath(player)
@@ -102,7 +101,7 @@ end)
 			return
 		end
 		if dying then return end
-		if playerStatus[player.UserId] ~= "alive" then return end
+		if PlayerStatus.Get(player) ~= "alive" then return end
 
 		local now = tick()
 		if now - (lastStep[player.UserId] or 0) < CONFIG.HEARTBEAT_INTERVAL then return end
@@ -125,19 +124,19 @@ end
 
 -- Fire spawn planks to client once it signals ready.
 evReady.OnServerEvent:Connect(function(player)
-	if playerStatus[player.UserId] == "frozen"
-		or playerStatus[player.UserId] == "alive" then
+	if PlayerStatus.Get(player) == "frozen"
+		or PlayerStatus.Get(player) == "alive" then
 		evSpawnPlanks:FireClient(player)
 	end
 end)
 
 -- Unfreeze player after countdown finishes.
 evPlayerReady.OnServerEvent:Connect(function(player)
-	if playerStatus[player.UserId] ~= "frozen" then return end
+	if PlayerStatus.Get(player) ~= "frozen" then return end
 	local character = player.Character
 	if not character then return end
 
-	playerStatus[player.UserId] = "alive"
+	PlayerStatus.Set(player, "alive")
 	CharacterLock.Unfreeze(character, CONFIG.WALK_SPEED, CONFIG.JUMP_POWER)
 	LeaderboardService.Init(player)
 end)
@@ -147,7 +146,7 @@ Players.PlayerAdded:Connect(function(player)
 	-- Listen for plank pickup events from this player.
 	local pickupConn = evPickup.OnServerEvent:Connect(function(plr, partName)
 		if plr ~= player then return end
-		if playerStatus[player.UserId] ~= "alive" then return end
+		if PlayerStatus.Get(player) ~= "alive" then return end
 
 		local now = tick()
 		if now - (pickupDebounce[player.UserId] or 0) < CONFIG.PICKUP_COOLDOWN then return end
@@ -171,12 +170,12 @@ Players.PlayerAdded:Connect(function(player)
 		if firstSpawn then
 			-- First spawn: freeze and show countdown.
 			firstSpawn = false
-			playerStatus[player.UserId] = "frozen"
+			PlayerStatus.Set(player, "frozen")
 			CharacterLock.Freeze(char)
 			evStartCountdown:FireClient(player)
 		else
 			-- Respawn after death: resume immediately.
-			playerStatus[player.UserId] = "alive"
+			PlayerStatus.Set(player, "alive")
 			LeaderboardService.Respawn(player)
 			BonusService.ResetDebounce(player)
 		end
@@ -193,7 +192,7 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-	playerStatus[player.UserId]   = nil
+	PlayerStatus.Cleanup(player)
 	lastStep[player.UserId]       = nil
 	pickupDebounce[player.UserId] = nil
 	BridgeService.FullCleanup(player)

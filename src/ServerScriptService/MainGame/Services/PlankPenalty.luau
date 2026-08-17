@@ -18,6 +18,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 
 local PlankService = require(ServerScriptService.MainGame.Services.PlankService)
+local PlayerStatus = require(script.Parent.PlayerStatus)
 
 local remotes   = ReplicatedStorage:WaitForChild("Remotes")
 local evScatter = remotes:WaitForChild("WhirlpoolCatch") -- reused as a generic "scatter planks" signal
@@ -44,6 +45,7 @@ end
 
 -- Lethal: no server-side reset needed, PlankService.Init on respawn handles it.
 function PlankPenalty.ScatterOnDeath(player: Player)
+	PlayerStatus.Set(player, "dead") 
 	evScatter:FireAllClients(player.UserId)
 end
 

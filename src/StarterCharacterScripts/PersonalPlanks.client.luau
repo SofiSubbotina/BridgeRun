@@ -149,6 +149,9 @@ local function showEntry(entry)
 		local char = player.Character
 		if not char then return end
 		if not hit:IsDescendantOf(char) then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid") 
+		if not humanoid or humanoid.Health <= 0 then return end
 		debounce = true
 
 		-- Hide immediately on touch — server handles the actual count.
