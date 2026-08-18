@@ -36,7 +36,10 @@ local planksTemplate = ReplicatedStorage
 local templateData = {}
 for _, levelFolder in ipairs(planksTemplate:GetChildren()) do
 	for _, part in ipairs(levelFolder:GetChildren()) do
-		templateData[part.Name] = part:GetAttribute("Planks") or 1
+		templateData[part] = {
+		amount = part:GetAttribute("Planks") or 1,
+		position = part.Position,
+		}
 	end
 end
 
@@ -47,6 +50,7 @@ local CONFIG = {
 	CLEANUP_DELAY      = 3,    -- seconds before bridge cleanup after death
 	HEARTBEAT_INTERVAL = 0.05, -- minimum seconds between water checks per player
 	PICKUP_COOLDOWN    = 0.3,  -- minimum seconds between plank pickup events
+	PICKUP_MAX_DISTANCE = 10,   -- studs, server-side proximity check for pickup requests
 }
 
 local lastStep       = {}
@@ -144,7 +148,7 @@ end)
 Players.PlayerAdded:Connect(function(player)
 	AnalyticsService.Init(player)
 	-- Listen for plank pickup events from this player.
-	local pickupConn = evPickup.OnServerEvent:Connect(function(plr, partName)
+	local pickupConn = evPickup.OnServerEvent:Connect(function(plr, plankInstance)
 		if plr ~= player then return end
 		if PlayerStatus.Get(player) ~= "alive" then return end
 
@@ -152,13 +156,18 @@ Players.PlayerAdded:Connect(function(player)
 		if now - (pickupDebounce[player.UserId] or 0) < CONFIG.PICKUP_COOLDOWN then return end
 		pickupDebounce[player.UserId] = now
 
-		if type(partName) ~= "string" then return end
-		local amount = templateData[partName]
-		if not amount then return end
+		if typeof(plankInstance) ~= "Instance" then return end
+		local template = templateData[plankInstance]
+		if not template then return end
 
-		PlankService.Add(player, amount)
+		local character = player.Character
+		local root       = character and character:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+		if (root.Position - template.position).Magnitude > CONFIG.PICKUP_MAX_DISTANCE then return end
+
+		PlankService.Add(player, template.amount)
 		syncPlanks(player)
-		evCollect:FireClient(player, amount)
+		evCollect:FireClient(player, template.amount)
 	end)
 
 	local firstSpawn = true

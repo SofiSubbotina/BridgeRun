@@ -96,7 +96,7 @@ local function buildPoolForLevel(levelFolder, levelId)
 
 		table.insert(pool, {
 			part         = part,
-			templateName = template.Name,
+			templateInstance = template,
 			amount       = amount,
 			templateCF   = template.CFrame,
 			levelId      = levelId,
@@ -156,7 +156,7 @@ local function showEntry(entry)
 
 		-- Hide immediately on touch — server handles the actual count.
 		hideEntry(entry)
-		evPickup:FireServer(entry.templateName)
+		evPickup:FireServer(entry.templateInstance)
 	end)
 end
 
