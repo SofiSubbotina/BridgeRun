@@ -13,6 +13,7 @@ local evSpawnPlanks   = remotes:WaitForChild("SpawnPersonalPlanks")
 local evPickup        = remotes:WaitForChild("PlankPickedUp")
 local evReady         = remotes:WaitForChild("ClientReady")
 local evLevelUnlocked = remotes:WaitForChild("LevelUnlocked")
+local evLevelReset    = remotes:WaitForChild("LevelReset")
 
 local planksTemplate = ReplicatedStorage
 	:WaitForChild("Clones")
@@ -191,6 +192,11 @@ evSpawnPlanks.OnClientEvent:Connect(spawnMyPlanks)
 evLevelUnlocked.OnClientEvent:Connect(function(levelId)
 	unlockedLevel = levelId
 	spawnPlanksForLevel(levelId)
+end)
+
+evLevelReset.OnClientEvent:Connect(function(levelId)
+	unlockedLevel = levelId
+	spawnMyPlanks()
 end)
 
 evReady:FireServer()

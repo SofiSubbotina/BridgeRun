@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local remotes         = ReplicatedStorage:WaitForChild("Remotes")
 local evLevelUnlocked = remotes:WaitForChild("LevelUnlocked")
+local evLevelReset    = remotes:WaitForChild("LevelReset")
 
 local levels         = workspace:WaitForChild("Levels")
 local unlockedLevels = { [1] = true } -- level 1 is always visible
@@ -55,5 +56,16 @@ evLevelUnlocked.OnClientEvent:Connect(function(levelId)
 	local levelFolder = levels:FindFirstChild("Level" .. levelId)
 	if levelFolder then
 		applyLevelVisibility(levelFolder, true)
+	end
+end)
+
+evLevelReset.OnClientEvent:Connect(function(level)
+	for _, child in ipairs(levels:GetChildren()) do
+		local levelId = getLevelId(child.Name)
+		if levelId then
+			local visible = levelId <= level
+			unlockedLevels[levelId] = visible or nil
+			applyLevelVisibility(child, visible)
+		end
 	end
 end)

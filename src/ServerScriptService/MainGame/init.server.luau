@@ -15,6 +15,7 @@ local CollisionGroups = require(script.Services.CollisionGroups)
 local AnalyticsService = require(script.Services.AnalyticsService)
 local PlankPenalty       = require(script.Services.PlankPenalty)
 local PlayerStatus       = require(script.Services.PlayerStatus)
+local LevelProgress      = require(script.Services.LevelProgress)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
@@ -26,6 +27,7 @@ local evPickup         = remotes:WaitForChild("PlankPickedUp")
 local evReady          = remotes:WaitForChild("ClientReady")
 local evPlayerReady    = remotes:WaitForChild("PlayerReady")
 local evStartCountdown = remotes:WaitForChild("StartCountdown")
+local evLevelReset     = remotes:WaitForChild("LevelReset")
 
 -- Plank amounts keyed by template name, used to validate pickup events.
 -- PlanksTemplate is organised into per-level sub-folders (Level1, Level2, …).
@@ -187,6 +189,9 @@ Players.PlayerAdded:Connect(function(player)
 			PlayerStatus.Set(player, "alive")
 			LeaderboardService.Respawn(player)
 			BonusService.ResetDebounce(player)
+
+			LevelProgress.Reset(player) 
+			evLevelReset:FireClient(player, LevelProgress.Get(player))
 		end
 
 		setupCharacter(player, char)

@@ -33,7 +33,8 @@
         "TrampolineJump":      { "$className": "RemoteEvent" },
         "LevelUnlocked":       { "$className": "RemoteEvent" },
         "WhirlpoolCatch":      { "$className": "RemoteEvent" },
-        "GetAnalytics":        { "$className": "RemoteFunction" }
+        "GetAnalytics":        { "$className": "RemoteFunction" },
+        "LevelReset":        { "$className": "RemoteFunction" }
       },
 
       "Clones": {

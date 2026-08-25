@@ -38,4 +38,8 @@ function LevelProgress.TryAdvance(player, levelId)
 	return false
 end
 
+function LevelProgress.Reset(player, level)
+	progress[player.UserId] = level or 1
+end
+
 return LevelProgress
