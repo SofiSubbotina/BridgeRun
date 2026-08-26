@@ -37,10 +37,12 @@ local planksTemplate = ReplicatedStorage
 
 local templateData = {}
 for _, levelFolder in ipairs(planksTemplate:GetChildren()) do
+	local levelId = tonumber(levelFolder.Name:match("^Level(%d+)$")) or 1
 	for _, part in ipairs(levelFolder:GetChildren()) do
 		templateData[part] = {
 		amount = part:GetAttribute("Planks") or 1,
 		position = part.Position,
+		levelId  = levelId,
 		}
 	end
 end
@@ -57,6 +59,7 @@ local CONFIG = {
 
 local lastStep       = {}
 local pickupDebounce = {}
+local collectedPlanks = {}
 
 local function syncPlanks(player)
 	evUpdate:FireAllClients(player.UserId, PlankService.Get(player))
@@ -149,6 +152,7 @@ end)
 
 Players.PlayerAdded:Connect(function(player)
 	AnalyticsService.Init(player)
+	collectedPlanks[player.UserId] = {}
 	-- Listen for plank pickup events from this player.
 	local pickupConn = evPickup.OnServerEvent:Connect(function(plr, plankInstance)
 		if plr ~= player then return end
@@ -162,10 +166,16 @@ Players.PlayerAdded:Connect(function(player)
 		local template = templateData[plankInstance]
 		if not template then return end
 
+		local collected = collectedPlanks[player.UserId]
+		if collected and collected[plankInstance] then return end
+        if not LevelProgress.HasAccess(player, template.levelId) then return end
+
 		local character = player.Character
 		local root       = character and character:FindFirstChild("HumanoidRootPart")
 		if not root then return end
 		if (root.Position - template.position).Magnitude > CONFIG.PICKUP_MAX_DISTANCE then return end
+
+		if collected then collected[plankInstance] = true end
 
 		PlankService.Add(player, template.amount)
 		syncPlanks(player)
@@ -189,6 +199,7 @@ Players.PlayerAdded:Connect(function(player)
 			PlayerStatus.Set(player, "alive")
 			LeaderboardService.Respawn(player)
 			BonusService.ResetDebounce(player)
+            collectedPlanks[player.UserId] = {}
 
 			LevelProgress.Reset(player) 
 			evLevelReset:FireClient(player, LevelProgress.Get(player))
@@ -209,6 +220,7 @@ Players.PlayerRemoving:Connect(function(player)
 	PlayerStatus.Cleanup(player)
 	lastStep[player.UserId]       = nil
 	pickupDebounce[player.UserId] = nil
+	collectedPlanks[player.UserId] = nil
 	BridgeService.FullCleanup(player)
 	PlankService.Cleanup(player)
 	BonusService.Cleanup(player)
