@@ -17,25 +17,22 @@ local activeList = panel:WaitForChild("ActiveList")
 
 type LeaderboardEntry = {
 	name:       string,
-	bestTime:   number?,  -- nil if player hasn't finished yet
+	elapsed:    number,   -- server-computed elapsed time at broadcast time (accounts for pauses)
+	live:       boolean,  -- true while this run is actively counting, not paused or finished
 	finishTime: number?,  -- elapsed seconds for this run, nil if still running
-	startTime:  number,   -- tick() when the run started
 	finished:   boolean,
 }
 type LeaderboardData = {
 	active:     { LeaderboardEntry },  -- all players currently in a run
-	top:      { LeaderboardEntry },  -- all-time top 10 from OrderedDataStore
-	serverTime: number,                -- server tick() at broadcast time (for clock sync)
+	top:      { LeaderboardEntry },    -- all-time top scores from OrderedDataStore
 }
 
 -- Initialised with empty arrays so Heartbeat guard `lastData.active` is safe
 -- before the first server broadcast arrives.
-local lastData: LeaderboardData = { active = {}, top = {}, serverTime = 0 }
+local lastData: LeaderboardData = { active = {}, top = {} }
 
 -- Stores per-player timer state so the Heartbeat loop can interpolate live times.
 local activeTimer = {}
-
--- ── Helpers ───────────────────────────────────────────────────────────────
 
 -- Formats a time in seconds as "M:SS.mm" (e.g. "1:04.32").
 local function formatTime(seconds)
@@ -112,17 +109,17 @@ end
 
 -- ── Leaderboard update ────────────────────────────────────────────────────
 
--- Rebuilds both panels whenever the server broadcasts new leaderboard data.
 local function updateLeaderboard(data: LeaderboardData)
 	lastData = data
 
-	-- Snapshot server time so live timers stay in sync with the server clock.
-	local serverNow = data.serverTime
+	-- Snapshot each active run's server-computed elapsed time so it can be
+	-- interpolated locally between broadcasts without needing a shared clock.
 	activeTimer = {}
 	for i, entry in ipairs(data.active) do
 		if not entry.finished then
 			activeTimer[i] = {
-				elapsed    = serverNow and (serverNow - entry.startTime) or 0,
+				elapsed    = entry.elapsed,
+				live       = entry.live,
 				receivedAt = tick(),  -- local time of receipt for interpolation
 			}
 		end
@@ -131,7 +128,7 @@ local function updateLeaderboard(data: LeaderboardData)
 	ensureLayout(topList)
 	ensureLayout(activeList)
 
-	-- Rebuild top-10 panel
+	-- Rebuild top panel
 	clearList(topList)
 	if #data.top == 0 then
 		local empty = Instance.new("TextLabel", topList)
@@ -178,7 +175,9 @@ RunService.Heartbeat:Connect(function()
 		if not entry.finished then
 			local t = activeTimer[i]
 			if t then
-				local current = t.elapsed + (tick() - t.receivedAt)
+			    -- Paused runs (respawning/dead) hold at t.elapsed; live runs
+				-- keep counting up from it locally between broadcasts.
+				local current = t.elapsed and (t.elapsed + (tick() - t.receivedAt)) or t.elapsed
 				for _, row in ipairs(rows) do
 					if row:IsA("Frame") and row.LayoutOrder == i then
 						local timeL = row:FindFirstChild("Time")

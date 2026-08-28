@@ -67,8 +67,14 @@ local function runCountdown()
 	evPlayerReady:FireServer()
 end
 
-evStartCountdown.OnClientEvent:Connect(function()
+evStartCountdown.OnClientEvent:Connect(function(showCountdown: boolean)
+	if showCountdown then
 	runCountdown()
+	else
+		-- Respawn/restart: no animation — just confirm control immediately
+		-- so the server starts timing the run without counting load time.
+		evPlayerReady:FireServer()
+	end
 end)
 
 player.CharacterRemoving:Connect(function()

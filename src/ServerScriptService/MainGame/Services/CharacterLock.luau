@@ -8,8 +8,8 @@ local CharacterLock = {}
 -- zeroVelocity additionally kills existing momentum — needed on finish,
 -- where the player must stop instantly instead of just losing control.
 function CharacterLock.Freeze(character, zeroVelocity)
-	local humanoid = character:FindFirstChild("Humanoid")
-	local root      = character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character:WaitForChild("Humanoid")
+	local root      = character:WaitForChild("HumanoidRootPart")
 
 	if humanoid then
 		humanoid.WalkSpeed = 0
@@ -26,8 +26,8 @@ function CharacterLock.Freeze(character, zeroVelocity)
 end
 
 function CharacterLock.Unfreeze(character, walkSpeed, jumpPower)
-	local humanoid = character:FindFirstChild("Humanoid")
-	local root      = character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character:WaitForChild("Humanoid")
+	local root      = character:WaitForChild("HumanoidRootPart")
 
 	if humanoid then
 		humanoid.WalkSpeed = walkSpeed

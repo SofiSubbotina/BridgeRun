@@ -19,7 +19,7 @@ local records   = {}
 local topCache = {}
 
 local CONFIG = {
-	TOP_COUNT    = 10,  -- how many places in the top
+	TOP_COUNT    = 20,  -- how many places in the top
 	MAX_RETRIES  = 3,   -- how many attempts to save
 }
 -- ── Save Queue ────────────────────────────────────────────────────────────
@@ -38,14 +38,8 @@ local function processSaveQueue()
 	isSaving = true
 	local item = table.remove(saveQueue, 1)
 	local userId  = item.userId
+	local rec     = item.rec
 	local attempt = item.attempt or 1
-
-	local rec = records[userId]
-	if not rec then
-		isSaving = false
-		task.defer(processSaveQueue)
-		return
-	end
 
 	local key    = "record_" .. userId
 	local timeMs = math.floor(rec.bestTime * 1000)
@@ -65,7 +59,7 @@ local function processSaveQueue()
 		warn("[LeaderboardService] Save failed, attempt", attempt, ":", err)
 		if attempt < CONFIG.MAX_RETRIES then
 			task.delay(2 ^ attempt, function()
-				table.insert(saveQueue, { userId = userId, attempt = attempt + 1 })
+				table.insert(saveQueue, { userId = userId, rec = rec, attempt = attempt + 1 })
 				isSaving = false
 				processSaveQueue()
 			end)
@@ -89,8 +83,8 @@ local function processSaveQueue()
 	task.defer(processSaveQueue)
 end
 
-local function queueSave(player)
-	table.insert(saveQueue, { userId = player.UserId, attempt = 1 })
+local function queueSave(player, rec)
+	table.insert(saveQueue, { userId = player.UserId, rec = rec, attempt = 1 })
 	processSaveQueue()
 end
 
@@ -173,18 +167,29 @@ local function loadPlayerRecord(player, attempt)
 		return
 	end
 	if result then
-		records[player.UserId] = result
+		local existing = records[player.UserId]
+		if not existing or result.bestTime < existing.bestTime then
+		   records[player.UserId] = result
+		end
 	end
 end
 
--- ── Remaining Functions (unchanged) ───────────────────────────────────────
+-- Elapsed = time already banked (accumulated) plus time since the current
+-- segment started (startTime). startTime == nil means the timer is paused
+-- (character loading in, or dead) and only `accumulated` counts. This is
+-- what lets a respawn/restart's load time be excluded from the run.
+local function elapsedFor(d)
+	local live = d.startTime and (tick() - d.startTime) or 0
+	return d.accumulated + live
+end
 
 local function getActive()
 	local list = {}
 	for _, d in pairs(current) do
 		table.insert(list, {
 			name       = d.name,
-			startTime  = d.startTime,
+			elapsed    = elapsedFor(d),
+			live       = d.startTime ~= nil,
 			finished   = d.finished,
 			finishTime = d.finishTime,
 		})
@@ -196,14 +201,16 @@ function LeaderboardService.Broadcast()
 	evLeaderboard:FireAllClients({
 		top      = topCache, 
 		active     = getActive(),
-		serverTime = tick(),
 	})
 end
 
+-- Called once the client confirms it's actually in control (via SpawnGate),
+-- so the timer starts live immediately — no loading time is ever counted.
 function LeaderboardService.Init(player)
 	task.defer(function() loadPlayerRecord(player) end)
 	current[player.UserId] = {
 		name       = player.DisplayName,
+		accumulated = 0,
 		startTime  = tick(),
 		finished   = false,
 		finishTime = nil,
@@ -212,11 +219,33 @@ function LeaderboardService.Init(player)
 	LeaderboardService.Broadcast()
 end
 
+-- Called right when the character respawns after death, before the client
+-- has confirmed it's ready. Resets run-finish state but leaves the timer
+-- paused (Pause() already ran on death) — SpawnGate calls Resume() once
+-- the client actually has control.
 function LeaderboardService.Respawn(player)
 	local d = current[player.UserId]
 	if not d then return end
 	d.finished   = false
 	d.finishTime = nil
+	LeaderboardService.Broadcast()
+end
+
+-- Pauses the timer — called on death. Safe to call when already paused.
+function LeaderboardService.Pause(player)
+	local d = current[player.UserId]
+	if not d or not d.startTime then return end
+	d.accumulated += tick() - d.startTime
+	d.startTime    = nil
+	LeaderboardService.Broadcast()
+end
+
+-- Resumes a paused timer. Called by SpawnGate once the client confirms
+-- it's actually in control of the character (respawn or restart).
+function LeaderboardService.Resume(player)
+	local d = current[player.UserId]
+	if not d or d.startTime then return end
+	d.startTime = tick()
 	LeaderboardService.Broadcast()
 end
 
@@ -229,14 +258,14 @@ end
 function LeaderboardService.PeekElapsed(player)
 	local d = current[player.UserId]
 	if not d or d.finished then return nil end
-	return tick() - d.startTime
+	return elapsedFor(d)
 end
 
 function LeaderboardService.Finish(player)
 	local d = current[player.UserId]
 	if not d or d.finished then return nil end
 
-	local elapsed = tick() - d.startTime
+	local elapsed = elapsedFor(d)
 	d.finished    = true
 	d.finishTime  = elapsed
 
@@ -244,11 +273,13 @@ function LeaderboardService.Finish(player)
 	local isNewRecord = not existing or elapsed < existing.bestTime
 
 	if isNewRecord then
-		records[player.UserId] = {
+		local rec = {
 			name     = player.DisplayName,
 			bestTime = elapsed,
 		}
-		task.defer(function() queueSave(player) end) -- save through the queue
+		records[player.UserId] = rec
+		-- rec passed by value into the queue so PlayerRemoving can't erase it before it's saved
+		task.defer(function() queueSave(player, rec) end) 
 	end
 
 	LeaderboardService.Broadcast()
@@ -260,7 +291,8 @@ end
 function LeaderboardService.NewRun(player)
 	current[player.UserId] = {
 		name       = player.DisplayName,
-		startTime  = tick(),
+		accumulated = 0,
+		startTime  = nil,
 		finished   = false,
 		finishTime = nil,
 		attempts   = 0,

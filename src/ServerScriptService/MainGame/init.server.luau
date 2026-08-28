@@ -16,6 +16,7 @@ local AnalyticsService = require(script.Services.AnalyticsService)
 local PlankPenalty       = require(script.Services.PlankPenalty)
 local PlayerStatus       = require(script.Services.PlayerStatus)
 local LevelProgress      = require(script.Services.LevelProgress)
+local SpawnGate           = require(script.Services.SpawnGate)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
@@ -25,7 +26,6 @@ local evSound          = remotes:WaitForChild("PlaySound")
 local evSpawnPlanks    = remotes:WaitForChild("SpawnPersonalPlanks")
 local evPickup         = remotes:WaitForChild("PlankPickedUp")
 local evReady          = remotes:WaitForChild("ClientReady")
-local evPlayerReady    = remotes:WaitForChild("PlayerReady")
 local evStartCountdown = remotes:WaitForChild("StartCountdown")
 local evLevelReset     = remotes:WaitForChild("LevelReset")
 
@@ -48,8 +48,6 @@ for _, levelFolder in ipairs(planksTemplate:GetChildren()) do
 end
 
 local CONFIG = {
-	WALK_SPEED         = 18,
-	JUMP_POWER         = 25,
 	DROWN_DELAY        = 1.5,  -- seconds before humanoid health is set to 0
 	CLEANUP_DELAY      = 3,    -- seconds before bridge cleanup after death
 	HEARTBEAT_INTERVAL = 0.05, -- minimum seconds between water checks per player
@@ -90,6 +88,7 @@ local function setupCharacter(player, character)
 	local humanoid = character:WaitForChild("Humanoid")
 	humanoid.Died:Connect(function()
 	LeaderboardService.AddAttempt(player)
+	LeaderboardService.Pause(player) -- stop the run clock the instant they die
 	AnalyticsService.AddAttempt(player)
 end)
 
@@ -139,17 +138,6 @@ evReady.OnServerEvent:Connect(function(player)
 	end
 end)
 
--- Unfreeze player after countdown finishes.
-evPlayerReady.OnServerEvent:Connect(function(player)
-	if PlayerStatus.Get(player) ~= "frozen" then return end
-	local character = player.Character
-	if not character then return end
-
-	PlayerStatus.Set(player, "alive")
-	CharacterLock.Unfreeze(character, CONFIG.WALK_SPEED, CONFIG.JUMP_POWER)
-	LeaderboardService.Init(player)
-end)
-
 Players.PlayerAdded:Connect(function(player)
 	AnalyticsService.Init(player)
 	collectedPlanks[player.UserId] = {}
@@ -188,21 +176,34 @@ Players.PlayerAdded:Connect(function(player)
 			char.AncestryChanged:Wait()
 		end
 
+		-- The object is "frozen"; SpawnGate holds it in a frozen state until the client 
+		-- confirms that control has been transferred to it. Time does not elapse during the loading process.
+		PlayerStatus.Set(player, "frozen") 
+
 		if firstSpawn then
-			-- First spawn: freeze and show countdown.
 			firstSpawn = false
-			PlayerStatus.Set(player, "frozen")
-			CharacterLock.Freeze(char)
-			evStartCountdown:FireClient(player)
-		else
-			-- Respawn after death: resume immediately.
+			evStartCountdown:FireClient(player, true)
+			SpawnGate.AwaitReady(player, char, function()
 			PlayerStatus.Set(player, "alive")
+			   CharacterLock.Freeze(char)
+			   LeaderboardService.Init(player)
+			end)
+		else
+			-- Respawn after death, or restart: run-finish state resets now,
+			-- but the timer stays paused until SpawnGate confirms the client
+			-- is actually ready (LeaderboardService.Resume runs it then).
 			LeaderboardService.Respawn(player)
 			BonusService.ResetDebounce(player)
             collectedPlanks[player.UserId] = {}
 
 			LevelProgress.Reset(player) 
 			evLevelReset:FireClient(player, LevelProgress.Get(player))
+
+			evStartCountdown:FireClient(player, false)
+			SpawnGate.AwaitReady(player, char, function()
+				PlayerStatus.Set(player, "alive")
+				LeaderboardService.Resume(player)
+			end)
 		end
 
 		setupCharacter(player, char)
@@ -218,6 +219,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
 	PlayerStatus.Cleanup(player)
+	SpawnGate.Cancel(player)
 	lastStep[player.UserId]       = nil
 	pickupDebounce[player.UserId] = nil
 	collectedPlanks[player.UserId] = nil
