@@ -97,4 +97,8 @@ function SwingingLog:Start()
 	end)
 end
 
+function SwingingLog.Cleanup(player: Player)
+	debounce[player.UserId] = nil
+end
+
 return SwingingLog

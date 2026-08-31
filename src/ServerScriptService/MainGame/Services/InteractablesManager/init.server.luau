@@ -2,8 +2,12 @@
 -- InteractablesManager.luau
 -- Finds all interactable objects by CollectionService tag and starts them.
 -- To add a new mechanic: create a module in Interactables/ and add one line here.
+--
+-- On PlayerRemoving, calls Cleanup(player) on every registered module that
+-- exports one — modules without per-player state (e.g. SpikeTrap) can skip it.
 
 local CollectionService = game:GetService("CollectionService")
+local Players           = game:GetService("Players")
 
 local Interactables = script.Interactables
 
@@ -26,3 +30,11 @@ for _, entry in REGISTRY do
 		entry.module.new(instance):Start()
 	end)
 end
+
+Players.PlayerRemoving:Connect(function(player)
+	for _, entry in REGISTRY do
+		if entry.module.Cleanup then
+			entry.module.Cleanup(player)
+		end
+	end
+end)

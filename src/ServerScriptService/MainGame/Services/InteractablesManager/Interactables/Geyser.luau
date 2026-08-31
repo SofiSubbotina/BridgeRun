@@ -183,4 +183,8 @@ function Geyser:Start()
 	end)
 end
 
+function Geyser.Cleanup(player: Player)
+	debounce[player.UserId] = nil
+end
+
 return Geyser

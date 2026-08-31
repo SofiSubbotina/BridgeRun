@@ -85,4 +85,8 @@ function Trampoline:Start()
 	end)
 end
 
+function Trampoline.Cleanup(player: Player)
+	debounce[player.UserId] = nil
+end
+
 return Trampoline
