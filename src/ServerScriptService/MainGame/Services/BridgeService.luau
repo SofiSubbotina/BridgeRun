@@ -1,12 +1,19 @@
--- BridgeService
+-- BridgeService.luau
 -- Manages the plank bridge: object pooling, water colliders,
 -- and water detection using raycasts.
+--
+-- When water is detected, the system first checks a "SafeGround"-tagged
+-- whitelist: any part marked as safe ground takes precedence over the
+-- water collider raycast. This prevents false drowning near the shore or
+-- at the player spawn point, even when the collider physically overlaps
+-- safe geometry.
 
 local BridgeService = {}
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
+local CollectionService  = game:GetService("CollectionService")
 
 local PlankService = require(script.Parent.PlankService)
 local CurrentZones  = require(script.Parent.CurrentZones)
@@ -52,6 +59,31 @@ RunService.Heartbeat:Connect(function()
 	frameCount = frameCount + 1
 end)
 
+-- ── Safe Ground Whitelist ─────────────────────────────────────────────────
+
+local safeGroundList = CollectionService:GetTagged("SafeGround")
+
+local function rebuildSafeGroundList()
+	safeGroundList = CollectionService:GetTagged("SafeGround")
+end
+
+CollectionService:GetInstanceAddedSignal("SafeGround"):Connect(rebuildSafeGroundList)
+CollectionService:GetInstanceRemovedSignal("SafeGround"):Connect(rebuildSafeGroundList)
+
+local function isOnSafeGround(root)
+	if #safeGroundList == 0 then return false end
+
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = safeGroundList
+	params.FilterType = Enum.RaycastFilterType.Include
+
+	return workspace:Raycast(
+		root.Position + Vector3.new(0, -1, 0),
+		Vector3.new(0, -4, 0),
+		params
+	) ~= nil
+end
+
 -- ── Public Functions ───────────────────────────────────────────────────────
 
 function BridgeService.Init(player, root)
@@ -78,6 +110,11 @@ function BridgeService.IsOnWater(root, character)
 	local d = placed[player.UserId]
 	if not d or not d.collider then return false end
 
+	if isOnSafeGround(root) then
+		waterCache[player.UserId] = { result = false, frame = frameCount }
+		return false
+	end
+	
 	local cache = waterCache[player.UserId]
 
 	if cache and (frameCount - cache.frame) < WATER_CACHE_FRAMES then
