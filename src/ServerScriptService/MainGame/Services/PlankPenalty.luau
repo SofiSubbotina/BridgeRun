@@ -49,4 +49,16 @@ function PlankPenalty.ScatterOnDeath(player: Player)
 	evScatter:FireAllClients(player.UserId)
 end
 
+-- Non-lethal partial reduction: player keeps playing, no scatter animation,
+-- so the client is synced immediately instead of after a delay.
+function PlankPenalty.Steal(player: Player, amount: number): number
+	local removed = math.min(amount, PlankService.Get(player))
+	if removed <= 0 then return 0 end
+
+	PlankService.Add(player, -removed)
+	evUpdate:FireAllClients(player.UserId, PlankService.Get(player))
+
+	return removed
+end
+
 return PlankPenalty
