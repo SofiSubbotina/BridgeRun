@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local PlankPenalty = require(ServerScriptService.MainGame.Services.PlankPenalty)
+local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
@@ -70,6 +71,8 @@ function SpikeTrap:_onTouch(hit: BasePart)
 
 	local player = Players:GetPlayerFromCharacter(character)
 	if not player then return end
+
+	if not LevelProgress.HasAccess(player, self._part:GetAttribute("LevelId") or 1) then return end
 
 	self._hit[character] = true
 

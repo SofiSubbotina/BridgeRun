@@ -15,6 +15,9 @@
 local Players      = game:GetService("Players")
 local Debris       = game:GetService("Debris")
 local TweenService = game:GetService("TweenService")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -130,6 +133,8 @@ function Geyser:_onTouch(hit: BasePart)
 	local player    = Players:GetPlayerFromCharacter(character)
 	if not player then return end
 	if debounce[player.UserId] then return end
+
+	if not LevelProgress.HasAccess(player, self._part:GetAttribute("LevelId") or 1) then return end
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local root     = character:FindFirstChild("HumanoidRootPart")

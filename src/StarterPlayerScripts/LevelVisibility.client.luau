@@ -27,6 +27,8 @@ local function applyVisibility(part, visible)
 		part.Enabled = visible
 		elseif part:IsA("Decal") or part:IsA("Texture") then
 		part.Transparency = visible and 0 or 1
+		elseif part:IsA("ParticleEmitter") then
+		part.Enabled = visible
 	end
 end
 

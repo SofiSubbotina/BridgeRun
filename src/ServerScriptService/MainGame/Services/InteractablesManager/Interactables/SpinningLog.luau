@@ -11,6 +11,7 @@ local Debris              = game:GetService("Debris")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local PlankPenalty = require(ServerScriptService.MainGame.Services.PlankPenalty)
+local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,8 @@ function SwingingLog:_onTouch(hit: BasePart)
 	local root     = character:FindFirstChild("HumanoidRootPart")
 	if not humanoid or not root then return end
 	if humanoid.Health <= 0 then return end
+
+	if not LevelProgress.HasAccess(player, self._part:GetAttribute("LevelId") or 1) then return end
 
 	debounce[player.UserId] = true
 
