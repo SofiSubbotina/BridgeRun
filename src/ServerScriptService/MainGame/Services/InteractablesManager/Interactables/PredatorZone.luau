@@ -3,18 +3,16 @@
 -- One instance = one zone Part with a child "Fish" MeshPart inside it.
 -- Found by tag "PredatorFish" via CollectionService in InteractablesManager.
 --
--- Idle: Fish tweens between random points inside the zone's bounds (X/Z
--- only, Y is fixed at spawn height). No Heartbeat runs while idle.
--- Occupied: Touched/TouchEnded tracks players currently in the zone.
--- Chasing runs on Heartbeat only while the zone is non-empty, and
--- re-targets the nearest player every tick.
--- Attack: DamageAmount and StealAmount are independent — either can be 0
--- to disable that half of the effect on a given zone. If a hit would
--- bring health to 0, PlankPenalty.ScatterOnDeath fires before the kill,
--- matching every other lethal trap in this project.
+-- Two update rates, chosen by whether a player is currently in the zone:
+--   - idle (patrolling): ticked on a slow shared loop (PATROL_TICK_RATE) —
+--     nobody is watching closely, so this doesn't need frame precision.
+--   - occupied (chasing): ticked on the shared Heartbeat, full rate —
+--     needed for accurate hit detection and responsive movement.
+-- The idle set can grow with the number of traps in the game; the chasing
+-- set is bounded by how many players are inside a trap zone at once, so
+-- total cost doesn't scale with total trap count.
 
 local RunService         = game:GetService("RunService")
-local TweenService       = game:GetService("TweenService")
 local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -27,23 +25,30 @@ local evDied       = remotes:WaitForChild("PlayerDied")
 local evSound     = remotes:WaitForChild("PlaySound")
 local bonusEffect = remotes:WaitForChild("BonusEffect")
 
--- ── Constants ────────────────────────────────────────────────────────────
+local FACING_CORRECTION = CFrame.Angles(0, math.pi, 0) -- fish mesh front faces +Z
 
-local PATROL_MIN_WAIT   = 1.0
-local PATROL_MAX_WAIT   = 2.5
-local FACING_CORRECTION = CFrame.Angles(0, math.pi, 0) -- model's nose faces local +Z, not Roblox's default -Z
+local PATROL_SPEED     = 6 -- independent of each zone's ChaseSpeed attribute
+local PATROL_MIN_WAIT  = 1.0
+local PATROL_MAX_WAIT  = 2.5
+local PATROL_TICK_RATE = 1 / 15 -- idle zones update 15x/sec, not 60x/sec
+local ARRIVE_THRESHOLD = 0.5
 
-local ALIVE_PULSE_SCALE = 0.06 -- fraction of body size, constant idle "breathing" cue
-local ALIVE_PULSE_TIME  = 0.8
-
--- ── Class ────────────────────────────────────────────────────────────────
+local TURN_SPEED = 8 -- how fast the fish turns to face its travel direction
 
 local PredatorZone = {}
 PredatorZone.__index = PredatorZone
 
+-- Idle (patrolling) zones, ticked by the slow loop at the bottom.
+local idleZones = {}
+-- Occupied (chasing) zones, ticked every Heartbeat frame.
+local chasingZones = {}
+
 function PredatorZone.new(zonePart: BasePart)
 	local fish = zonePart:FindFirstChild("Fish")
 	assert(fish and fish:IsA("BasePart"), "PredatorZone: child 'Fish' not found in " .. zonePart:GetFullName())
+
+	local levelId = zonePart:GetAttribute("LevelId")
+	assert(levelId ~= nil, "PredatorZone: 'LevelId' attribute not set on " .. zonePart:GetFullName())
 
 	local self = setmetatable({
 		_zone = zonePart,
@@ -55,20 +60,23 @@ function PredatorZone.new(zonePart: BasePart)
 		_chaseSpeed     = zonePart:GetAttribute("ChaseSpeed") or 12,
 		_damageAmount   = zonePart:GetAttribute("DamageAmount") or 10,
 		_stealAmount    = zonePart:GetAttribute("StealAmount") or 3,
-		_levelId        = zonePart:GetAttribute("LevelId") or 1,
+		_levelId        = levelId,
 
 		_playersInZone = {} :: { [Player]: boolean },
 
-		_chasing      = false,
-		_cooldown     = false,
-		_chaseConn    = nil :: RBXScriptConnection?,
-		_currentTween = nil :: Tween?,
+		-- Per-player attack cooldown: catching one player doesn't protect
+		-- everyone else nearby — each player gets bitten independently,
+		-- at most once per AttackCooldown for themselves.
+		_cooldownUntil = {} :: { [Player]: number },
+
+		-- "waiting" | "moving", only meaningful while in idleZones
+		_state        = "waiting",
+		_waitTimer    = 0,
+		_patrolTarget = nil :: Vector3?,
 	}, PredatorZone)
 
 	return self
 end
-
--- ── Private: presence ─────────────────────────────────────────────────────
 
 function PredatorZone:_hasPlayers(): boolean
 	return next(self._playersInZone) ~= nil
@@ -93,8 +101,6 @@ function PredatorZone:_nearestPlayer(): (Player?, number)
 	return nearest, nearestDist
 end
 
--- ── Private: patrol (Tween-driven, runs only while the zone is empty) ────
-
 function PredatorZone:_randomPointInZone(): Vector3
 	local size = self._zone.Size
 	local cf   = self._zone.CFrame
@@ -104,40 +110,31 @@ function PredatorZone:_randomPointInZone(): Vector3
 	return Vector3.new(world.X, self._fixedY, world.Z)
 end
 
-function PredatorZone:_startPatrol()
-	if self._chasing then return end
+-- Steps the fish one frame toward targetPos and smoothly turns it to face
+-- its actual travel direction. Returns true once it has arrived.
+function PredatorZone:_stepToward(targetPos: Vector3, speed: number, dt: number): boolean
+	local current = self._fish.Position
+	local toTarget = Vector3.new(targetPos.X - current.X, 0, targetPos.Z - current.Z)
+	local distance = toTarget.Magnitude
 
-	task.spawn(function()
-		while not self:_hasPlayers() do
-			local target = self:_randomPointInZone()
-			local current = self._fish.Position
-			local direction = target - current
-			local flatDistance = Vector3.new(direction.X, 0, direction.Z).Magnitude
-			local duration = math.max(flatDistance / (self._chaseSpeed * 0.4), 0.5)
+	if distance <= ARRIVE_THRESHOLD then
+		return true
+	end
 
-			local goalCFrame
-			if direction.Magnitude > 0.05 then
-				goalCFrame = CFrame.lookAt(target, target + direction) * FACING_CORRECTION
-			else
-				goalCFrame = self._fish.CFrame - self._fish.CFrame.Position + target
-			end
+	local step = toTarget.Unit * speed * dt
+	if step.Magnitude > distance then
+		step = toTarget
+	end
+	local newPos = Vector3.new(current.X + step.X, self._fixedY, current.Z + step.Z)
 
-			local tween = TweenService:Create(
-				self._fish,
-				TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-				{ CFrame = goalCFrame }
-			)
-			self._currentTween = tween
-			tween:Play()
-			tween.Completed:Wait()
+	local desiredLook = CFrame.lookAt(newPos, newPos + toTarget) * FACING_CORRECTION
+	local rotAlpha = math.clamp(TURN_SPEED * dt, 0, 1)
+	local blendedRotation = self._fish.CFrame.Rotation:Lerp(desiredLook.Rotation, rotAlpha)
 
-			if self:_hasPlayers() then break end
-			task.wait(math.random() * (PATROL_MAX_WAIT - PATROL_MIN_WAIT) + PATROL_MIN_WAIT)
-		end
-	end)
+	self._fish.CFrame = CFrame.new(newPos) * blendedRotation
+
+	return false
 end
-
--- ── Private: attack ────────────────────────────────────────────────────────
 
 function PredatorZone:_applyHit(player: Player)
 	if not LevelProgress.HasAccess(player, self._levelId) then return end
@@ -146,14 +143,11 @@ function PredatorZone:_applyHit(player: Player)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return end
 
-	self._cooldown = true
-	task.delay(self._attackCooldown, function()
-		self._cooldown = false
-	end)
+	self._cooldownUntil[player] = tick() + self._attackCooldown
 
 	-- A damaging hit that would reach 0 HP must scatter planks before death,
-	-- same requirement as every other lethal trap — TakeDamage() doesn't let
-	-- us control that ordering, so the lethal case is handled manually here.
+	-- same as every other lethal trap. TakeDamage() doesn't let us control
+	-- that ordering, so the lethal case is handled manually here.
 	local lethalHit = self._damageAmount > 0 and (humanoid.Health - self._damageAmount) <= 0
 
 	if lethalHit then
@@ -187,80 +181,105 @@ function PredatorZone:_applyHit(player: Player)
 	end
 end
 
--- ── Private: chase (Heartbeat, only while the zone is occupied) ──────────
-
-function PredatorZone:_startChase()
-	if self._chaseConn then return end
-	self._chasing = true
-
-	if self._currentTween then
-		self._currentTween:Cancel()
-		self._currentTween = nil
-	end
-
-	self._chaseConn = RunService.Heartbeat:Connect(function(dt)
-		if not self:_hasPlayers() then
-			self._chaseConn:Disconnect()
-			self._chaseConn = nil
-			self._chasing = false
-			self:_startPatrol()
-			return
-		end
-
-		local target, distance = self:_nearestPlayer()
-		if not target then return end
-
-		local root = target.Character.HumanoidRootPart
-		local current = self._fish.Position
-		local toTarget = Vector3.new(root.Position.X - current.X, 0, root.Position.Z - current.Z)
-
-		if toTarget.Magnitude > 0.1 then
-			local step = toTarget.Unit * self._chaseSpeed * dt
-			if step.Magnitude > toTarget.Magnitude then
-				step = toTarget
-			end
-			local newPos = Vector3.new(current.X + step.X, self._fixedY, current.Z + step.Z)
-			self._fish.CFrame = CFrame.lookAt(newPos, newPos + toTarget) * FACING_CORRECTION
-		end
-
-		if not self._cooldown and distance <= self._attackRange then
-			self:_applyHit(target)
-		end
-	end)
+-- Moves this zone from idle to chasing (or vice versa) when its player
+-- occupancy flips. Called from Touched/TouchEnded, not from the tick loops.
+function PredatorZone:_enterChase()
+	idleZones[self] = nil
+	chasingZones[self] = true
 end
 
--- ── Public ──────────────────────────────────────────────────────────────
+function PredatorZone:_exitChase()
+	chasingZones[self] = nil
+	idleZones[self] = true
+	self._state = "waiting"
+	self._waitTimer = math.random() * (PATROL_MAX_WAIT - PATROL_MIN_WAIT) + PATROL_MIN_WAIT
+end
+
+-- Called for zones in chasingZones, every Heartbeat frame.
+function PredatorZone:_updateChase(dt: number)
+	local target, distance = self:_nearestPlayer()
+	if not target then return end
+
+	local root = target.Character.HumanoidRootPart
+	self:_stepToward(Vector3.new(root.Position.X, self._fixedY, root.Position.Z), self._chaseSpeed, dt)
+
+	local cooldownUntil = self._cooldownUntil[target]
+	local offCooldown   = not cooldownUntil or tick() >= cooldownUntil
+	if offCooldown and distance <= self._attackRange then
+		self:_applyHit(target)
+	end
+end
+
+-- Called for zones in idleZones, on the slow shared loop.
+function PredatorZone:_updatePatrol(dt: number)
+	if self._state == "waiting" then
+		self._waitTimer -= dt
+		if self._waitTimer <= 0 then
+			self._patrolTarget = self:_randomPointInZone()
+			self._state = "moving"
+		end
+	elseif self._state == "moving" then
+		local arrived = self:_stepToward(self._patrolTarget :: Vector3, PATROL_SPEED, dt)
+		if arrived then
+			self._state = "waiting"
+			self._waitTimer = math.random() * (PATROL_MAX_WAIT - PATROL_MIN_WAIT) + PATROL_MIN_WAIT
+		end
+	end
+end
 
 function PredatorZone:Start()
 	self._zone.Touched:Connect(function(hit)
+		if hit.Name ~= "HumanoidRootPart" then return end
+
 		local character = hit.Parent
 		local player = character and Players:GetPlayerFromCharacter(character)
 		if not player or self._playersInZone[player] then return end
 
+		local wasEmpty = not self:_hasPlayers()
 		self._playersInZone[player] = true
-		self:_startChase()
+		if wasEmpty then
+			self:_enterChase()
+		end
 	end)
 
 	self._zone.TouchEnded:Connect(function(hit)
+		if hit.Name ~= "HumanoidRootPart" then return end
+
 		local character = hit.Parent
 		local player = character and Players:GetPlayerFromCharacter(character)
-		if player then
-			self._playersInZone[player] = nil
+		if not player then return end
+
+		self._playersInZone[player] = nil
+		if not self:_hasPlayers() then
+			self:_exitChase()
 		end
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
+		local hadPlayer = self._playersInZone[player]
 		self._playersInZone[player] = nil
+		self._cooldownUntil[player] = nil
+		if hadPlayer and not self:_hasPlayers() then
+			self:_exitChase()
+		end
 	end)
 
-	local baseSize = self._fish.Size
-	TweenService:Create(
-		self._fish,
-		TweenInfo.new(ALIVE_PULSE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Size = baseSize * (1 + ALIVE_PULSE_SCALE) }
-	):Play()
-
-	self:_startPatrol()
+	idleZones[self] = true
 end
+
+RunService.Heartbeat:Connect(function(dt)
+	for zone in chasingZones do
+		zone:_updateChase(dt)
+	end
+end)
+
+task.spawn(function()
+	while true do
+		local dt = task.wait(PATROL_TICK_RATE)
+		for zone in idleZones do
+			zone:_updatePatrol(dt)
+		end
+	end
+end)
 
 return PredatorZone
