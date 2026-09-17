@@ -17,11 +17,11 @@ local Players             = game:GetService("Players")
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local PlankPenalty  = require(ServerScriptService.MainGame.Services.PlankPenalty)
+local LethalHit      = require(ServerScriptService.MainGame.Services.LethalHit)
+local PlankPenalty  = require(ServerScriptService.MainGame.Services.PlankPenalty)  -- needed for the non-lethal Steal() branch below
 local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
 
 local remotes     = ReplicatedStorage:WaitForChild("Remotes")
-local evDied       = remotes:WaitForChild("PlayerDied")
 local evSound     = remotes:WaitForChild("PlaySound")
 local bonusEffect = remotes:WaitForChild("BonusEffect")
 
@@ -151,10 +151,7 @@ function PredatorZone:_applyHit(player: Player)
 	local lethalHit = self._damageAmount > 0 and (humanoid.Health - self._damageAmount) <= 0
 
 	if lethalHit then
-		PlankPenalty.ScatterOnDeath(player)
-		evDied:FireClient(player)
-		evSound:FireClient(player, "DrownSound")
-		humanoid.Health = 0
+LethalHit.Kill(player, humanoid)
 		return
 	end
 
