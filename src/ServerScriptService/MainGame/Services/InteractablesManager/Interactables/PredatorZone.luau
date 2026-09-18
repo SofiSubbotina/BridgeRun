@@ -22,7 +22,6 @@ local PlankPenalty  = require(ServerScriptService.MainGame.Services.PlankPenalty
 local LevelProgress = require(ServerScriptService.MainGame.Services.LevelProgress)
 
 local remotes     = ReplicatedStorage:WaitForChild("Remotes")
-local evSound     = remotes:WaitForChild("PlaySound")
 local bonusEffect = remotes:WaitForChild("BonusEffect")
 
 local FACING_CORRECTION = CFrame.Angles(0, math.pi, 0) -- fish mesh front faces +Z
@@ -62,7 +61,7 @@ function PredatorZone.new(zonePart: BasePart)
 		_stealAmount    = zonePart:GetAttribute("StealAmount") or 3,
 		_levelId        = levelId,
 
-		_playersInZone = {} :: { [Player]: boolean },
+		_playersInZone = {} :: { [Player]: number },
 
 		-- Per-player attack cooldown: catching one player doesn't protect
 		-- everyone else nearby — each player gets bitten independently,
@@ -160,10 +159,6 @@ LethalHit.Kill(player, humanoid)
 		humanoid:TakeDamage(self._damageAmount)
 	end
 
-	if stolen > 0 or self._damageAmount > 0 then
-		evSound:FireClient(player, "BitingFish")
-	end
-
 	local text
 	if self._damageAmount > 0 and stolen > 0 then
 		text = string.format("-%d HP\n-%d planks", self._damageAmount, stolen)
@@ -226,29 +221,32 @@ end
 
 function PredatorZone:Start()
 	self._zone.Touched:Connect(function(hit)
-		if hit.Name ~= "HumanoidRootPart" then return end
-
 		local character = hit.Parent
 		local player = character and Players:GetPlayerFromCharacter(character)
-		if not player or self._playersInZone[player] then return end
+		if not player then return end
 
 		local wasEmpty = not self:_hasPlayers()
-		self._playersInZone[player] = true
+		self._playersInZone[player] = (self._playersInZone[player] or 0) + 1
 		if wasEmpty then
 			self:_enterChase()
 		end
 	end)
 
 	self._zone.TouchEnded:Connect(function(hit)
-		if hit.Name ~= "HumanoidRootPart" then return end
-
 		local character = hit.Parent
 		local player = character and Players:GetPlayerFromCharacter(character)
 		if not player then return end
 
-		self._playersInZone[player] = nil
-		if not self:_hasPlayers() then
-			self:_exitChase()
+		local count = self._playersInZone[player]
+		if not count then return end
+
+		if count <= 1 then
+		    self._playersInZone[player] = nil
+		    if not self:_hasPlayers() then
+			   self:_exitChase()
+		end
+		else
+			self._playersInZone[player] = count - 1
 		end
 	end)
 
