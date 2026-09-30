@@ -10,13 +10,13 @@ local PlankService       = require(script.Services.PlankService)
 local BridgeService      = require(script.Services.BridgeService)
 local BonusService       = require(script.Services.BonusService)
 local LeaderboardService = require(script.Services.LeaderboardService)
-local CharacterLock      = require(script.Services.CharacterLock)
 local CollisionGroups = require(script.Services.CollisionGroups)
 local AnalyticsService = require(script.Services.AnalyticsService)
 local LethalHit           = require(script.Services.LethalHit)
 local PlayerStatus       = require(script.Services.PlayerStatus)
 local LevelProgress      = require(script.Services.LevelProgress)
 local SpawnGate           = require(script.Services.SpawnGate)
+local CheckpointService  = require(script.Services.CheckpointService)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
@@ -66,10 +66,6 @@ local function handleDrown(player, character, humanoid, conn)
     
 	BridgeService.DrownPlayer(player)
 	LethalHit.Kill(player, humanoid, { delay = CONFIG.DROWN_DELAY })
-
-	task.delay(CONFIG.CLEANUP_DELAY, function()
-		BridgeService.Cleanup(player)
-	end)
 
 	task.delay(CONFIG.CLEANUP_DELAY, function()
 		BridgeService.Cleanup(player)
@@ -127,16 +123,23 @@ end)
 	end)
 end
 
--- Fire spawn planks to client once it signals ready.
+-- Fire spawn planks to client once it signals ready. The current unlocked
+-- level rides along in this same event — never trust a separately-pushed
+-- LevelReset broadcast for this: that one can arrive (and get silently
+-- dropped) before the client script has even connected its listener yet,
+-- since PersonalPlanks lives in StarterCharacterScripts and rebuilds from
+-- scratch on every respawn. This reply, by construction, can't arrive
+-- before the client is listening — it's a direct response to ClientReady.
 evReady.OnServerEvent:Connect(function(player)
 	if PlayerStatus.Get(player) == "frozen"
 		or PlayerStatus.Get(player) == "alive" then
-		evSpawnPlanks:FireClient(player)
+		evSpawnPlanks:FireClient(player, LevelProgress.Get(player))
 	end
 end)
 
 Players.PlayerAdded:Connect(function(player)
 	AnalyticsService.Init(player)
+	CheckpointService.Reset(player)
 	collectedPlanks[player.UserId] = {}
 	-- Listen for plank pickup events from this player.
 	local pickupConn = evPickup.OnServerEvent:Connect(function(plr, plankInstance)
@@ -182,18 +185,22 @@ Players.PlayerAdded:Connect(function(player)
 			evStartCountdown:FireClient(player, true)
 			SpawnGate.AwaitReady(player, char, function()
 			PlayerStatus.Set(player, "alive")
-			   CharacterLock.Freeze(char)
 			   LeaderboardService.Init(player)
 			end)
 		else
 			-- Respawn after death, or restart: run-finish state resets now,
 			-- but the timer stays paused until SpawnGate confirms the client
 			-- is actually ready (LeaderboardService.Resume runs it then).
+			--
+			-- LevelProgress is deliberately NOT reset here: an ordinary death
+			-- keeps whatever level the player already unlocked — that's the
+			-- whole point of checkpoints. A full restart resets it instead,
+			-- from FinishTrigger's PlayerRestart handler, before this fires.
+
 			LeaderboardService.Respawn(player)
 			BonusService.ResetDebounce(player)
             collectedPlanks[player.UserId] = {}
 
-			LevelProgress.Reset(player) 
 			evLevelReset:FireClient(player, LevelProgress.Get(player))
 
 			evStartCountdown:FireClient(player, false)

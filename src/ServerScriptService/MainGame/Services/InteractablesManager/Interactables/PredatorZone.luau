@@ -61,12 +61,15 @@ function PredatorZone.new(zonePart: BasePart)
 		_stealAmount    = zonePart:GetAttribute("StealAmount") or 3,
 		_levelId        = levelId,
 
+		_leashRadius = zonePart:GetAttribute("LeashRadius")
+			or (Vector3.new(zonePart.Size.X, 0, zonePart.Size.Z).Magnitude / 2 + 30),
+
 		_playersInZone = {} :: { [Player]: number },
 
 		-- Per-player attack cooldown: catching one player doesn't protect
-		-- everyone else nearby — each player gets bitten independently,
-		-- at most once per AttackCooldown for themselves.
+		-- everyone else nearby — each player gets bitten
 		_cooldownUntil = {} :: { [Player]: number },
+		_diedConnections = {} :: { [Player]: RBXScriptConnection },
 
 		-- "waiting" | "moving", only meaningful while in idleZones
 		_state        = "waiting",
@@ -79,6 +82,21 @@ end
 
 function PredatorZone:_hasPlayers(): boolean
 	return next(self._playersInZone) ~= nil
+end
+
+function PredatorZone:_forgetPlayer(player: Player)
+	self._playersInZone[player]  = nil
+	self._cooldownUntil[player]  = nil
+
+	local diedConn = self._diedConnections[player]
+	if diedConn then
+		diedConn:Disconnect()
+		self._diedConnections[player] = nil
+	end
+
+	if not self:_hasPlayers() then
+		self:_exitChase()
+	end
 end
 
 function PredatorZone:_nearestPlayer(): (Player?, number)
@@ -193,6 +211,12 @@ function PredatorZone:_updateChase(dt: number)
 	if not target then return end
 
 	local root = target.Character.HumanoidRootPart
+	local distanceFromZone = (self._zone.Position - root.Position).Magnitude
+	if distanceFromZone > self._leashRadius then
+		self:_forgetPlayer(target)
+		return
+	end
+
 	self:_stepToward(Vector3.new(root.Position.X, self._fixedY, root.Position.Z), self._chaseSpeed, dt)
 
 	local cooldownUntil = self._cooldownUntil[target]
@@ -226,7 +250,18 @@ function PredatorZone:Start()
 		if not player then return end
 
 		local wasEmpty = not self:_hasPlayers()
+		local isFirstTouch = self._playersInZone[player] == nil
 		self._playersInZone[player] = (self._playersInZone[player] or 0) + 1
+
+		if isFirstTouch then
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				self._diedConnections[player] = humanoid.Died:Connect(function()
+					self:_forgetPlayer(player)
+				end)
+			end
+		end
+
 		if wasEmpty then
 			self:_enterChase()
 		end
@@ -241,21 +276,15 @@ function PredatorZone:Start()
 		if not count then return end
 
 		if count <= 1 then
-		    self._playersInZone[player] = nil
-		    if not self:_hasPlayers() then
-			   self:_exitChase()
-		end
+		    self:_forgetPlayer(player)
 		else
 			self._playersInZone[player] = count - 1
 		end
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
-		local hadPlayer = self._playersInZone[player]
-		self._playersInZone[player] = nil
-		self._cooldownUntil[player] = nil
-		if hadPlayer and not self:_hasPlayers() then
-			self:_exitChase()
+		if self._playersInZone[player] then
+			self:_forgetPlayer(player)
 		end
 	end)
 

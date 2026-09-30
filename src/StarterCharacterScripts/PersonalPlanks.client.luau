@@ -185,8 +185,13 @@ end
 
 buildPool()
 
--- Spawn all currently unlocked planks on respawn.
-evSpawnPlanks.OnClientEvent:Connect(spawnMyPlanks)
+-- Spawn all currently unlocked planks on respawn. The level comes straight
+-- from the server in this same event, not from a separate LevelReset push —
+-- see the comment on the server side for why that one can't be trusted here.
+evSpawnPlanks.OnClientEvent:Connect(function(levelId)
+unlockedLevel = levelId
+	spawnMyPlanks()
+end)
 
 -- Spawn planks for the newly unlocked level.
 evLevelUnlocked.OnClientEvent:Connect(function(levelId)
