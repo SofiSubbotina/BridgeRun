@@ -1,125 +1,172 @@
 # 🌉 Plank Rush
-<img width="1351" height="646" alt="image" src="https://github.com/user-attachments/assets/eb21cfe6-90b5-490c-ba7b-3e42cc4f9c71" />
 
-A Roblox game where players collect planks and build a bridge across water in real time — racing against others to reach the finish line.
+<img width="1351" height="646" alt="Plank Rush gameplay" src="https://github.com/user-attachments/assets/eb21cfe6-90b5-490c-ba7b-3e42cc4f9c71" />
+
+A multiplayer Roblox runner. Collect planks, walk out over the water building your bridge as you go, get through traps and hazards, and race other players to the finish.
+
+**[▶ Play on Roblox](https://www.roblox.com/games/97476080303924/Plank-Rush)**
+
+Built solo: server and client code, game systems, UI and level layout.
+
+---
 
 ## Gameplay
 
-- Collect planks scattered across the map
-- Walk over water to automatically place planks and build your bridge
-- Fall in if you run out — try again with a countdown
-- Hit bonus zones to multiply your planks, or penalty zones to lose some
-- Use trampolines to launch across gaps
-- Navigate whirlpools, geysers, and spike traps along the way
-- Finish the run and compete for the best time on the leaderboard
+- Collect planks scattered across the map. Walking over water places them automatically and builds your bridge
+- Run out of planks over water and you fall in. Respawn at your last checkpoint
+- Bonus walls multiply your planks, penalty walls take a share away
+- Hazards: spike traps, geysers, swinging logs, whirlpools, current zones that push you downstream, and predator-fish zones that bite and steal planks
+- Trampolines launch you across gaps
+- The map is split into levels. Finishing a level unlocks the next one and moves your respawn point forward
+- Global leaderboard of best times, plus a live list of players currently running
 
-## Technical Highlights
+---
 
-**Server architecture**
-- Modular service layer under `MainGame/Services`: `BridgeService`, `PlankService`, `BonusService`, `LeaderboardService`, `LevelProgress`, `CharacterLock`, `CollisionGroups`, `AnalyticsService`
-- Trap/interactable system (`InteractablesManager` + `Interactables/`) with per-trap modules: `Trampoline`, `SpikeTrap`, `Geyser`
-- Object pool for bridge planks (100 parts pre-allocated in batches to avoid frame spikes)
-- Raycast-based water detection with per-player frame cache
-- DataStore with async save queue, exponential backoff retry, and `BindToClose` safety save
-- OrderedDataStore for persistent top-10 leaderboard
-- Player session analytics (join time, attempts, finish status, region) written to a separate DataStore, exposed through a `RemoteFunction` gated server-side to a developer-only allowlist — no client-side trust involved
+## Client
 
-**Client**
-- Auto-run with mobile/desktop input handling
-- Animated plank stack that updates in real time for all players
-- Trampoline flip animation synced across clients
-- Drown effect with particles, screen overlay, and sinking tween
-- Bonus/penalty floating text with particle burst
+- Auto-run with mobile and desktop input handling
+- Carried plank stack mirrored on other players and scattered on death or trap hits
+- Animations (trampoline flip) synced across clients
 - Live leaderboard with client-side timer interpolation
-- Countdown system with shared state module
-- Developer-only analytics panel (in-game, hotkey-toggled), destroyed client-side for anyone outside the allowlist
+- Per-client level visibility: locked levels stay hidden until unlocked
 
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Client
+        C1[AutoRun / PersonalPlanks / PlankStack]
+        C2[GUIs: HUD, Leaderboard, Countdown, Finish]
+        C3[MapEffectsManager, LevelVisibility, effects]
+    end
+
+    R{{Remotes}}
+
+    subgraph Server
+        M[MainGame<br/>player lifecycle]
+        S[Services<br/>Bridge, Plank, Bonus, Leaderboard,<br/>LevelProgress, Checkpoint, SpawnGate,<br/>PlayerStatus, CollisionGroups, Analytics]
+        I[InteractablesManager<br/>tag registry]
+        T[Interactables<br/>SpikeTrap, Trampoline, Geyser,<br/>SpinningLog, PredatorZone]
+        W[WhirlpoolManager]
+    end
+
+    Client <--> R <--> M
+    M --> S
+    I --> T
+    T --> S
+    W --> S
+```
+
+- `MainGame` owns the player lifecycle (spawn, death, respawn, cleanup) and delegates everything else to single-purpose services under `MainGame/Services`. Each system can be reasoned about on its own, without tangling unrelated features together
+- Interactive map objects are found through `CollectionService` tags and started by `InteractablesManager`; each mechanic is its own module
+- The client never decides gameplay outcomes: pickups, bonuses, level access and admin data are validated on the server
+
+---
 
 ## Technical Decisions
 
-**Object pooling for performance**
-Cloning parts every time a plank is placed caused visible frame spikes.
-I switched to pre-allocating a pool of 100 parts in batches (20 per frame)
-so the server never stalls mid-run.
+**Tag-driven interactables.** Traps, bonuses, trampolines, current zones and similar map objects are found by `CollectionService` tag and configured with attributes. Placing another instance of an existing trap needs no code; a new trap type is one module in `Interactables/` plus one line in the registry. Level building stays out of the code.
 
-**Reliable DataStore saves**
-A simple SetAsync call loses data under Roblox throttling.
-I built an async save queue with exponential backoff retry and a BindToClose
-safety flush — so records survive both normal play and server shutdowns.
+**Object pooling.** Cloning a part for every placed plank caused visible frame spikes. `PlankPool` is a generic per-player pool: 100 parts pre-allocated in batches of 20 per frame, then acquired and released. It knows nothing about bridges; `BridgeService` decides what the pooled parts mean (including letting them drift in current zones).
 
-**Client-server sync without spam**
-The leaderboard timer updates every frame on the client via local interpolation,
-while the server only broadcasts on actual state changes.
-This keeps the UI smooth without flooding the network.
+**Water detection.** Each player has a personal water collider and a raycast-based check, cached for a few frames. A `SafeGround` tag whitelist takes precedence, so shorelines and spawn areas don't cause false drownings.
 
-**Separating concerns in a game server**
-Splitting logic into BridgeService / PlankService / BonusService / LeaderboardService
-made it easy to reason about each system independently and avoid spaghetti
-between unrelated features.
+**Reliable DataStore saves.** A plain `SetAsync` loses data under throttling. Records go through an async save queue with exponential backoff retry; `UpdateAsync` keeps the better time if two writes race, and `BindToClose` flushes on shutdown. The top-20 board is read from an `OrderedDataStore`, and refreshes are coalesced so repeated finishes don't spam the store.
 
-**Admin tooling that never trusts the client**
-The analytics panel looks like a normal in-game GUI, but every piece of data
-it displays is fetched through a RemoteFunction whose server-side handler checks
-the caller's UserId against an allowlist before returning anything. A non-admin
-client gets an empty response and the GUI destroys itself — access control lives
-entirely on the server, not hidden behind a client-side check.
+**Level gating in two layers.** Solid level geometry is blocked physically with collision groups (a player at stage N can't collide with geometry of level N+1 and above). Trigger parts have `CanCollide = false`, so collision groups can't stop them; every hazard checks `LevelProgress.HasAccess` itself. The client hides locked levels with `LocalTransparencyModifier`.
+
+**Spawn gate: loading time doesn't count.** On every spawn the character is frozen and the run timer stays paused until the client confirms it's in control (`SpawnGate`, `PlayerStatus`). The first spawn shows a countdown, respawns confirm silently. Load time never ends up in a run time.
+
+**One entry point for lethal hits.** `LethalHit.Kill` runs the same sequence for every lethal trap: scatter carried planks, fire the death remotes, then zero health, optionally after a delay. The order matters, because the client clears the carried stack when it sees the death event, so the scatter signal has to land first. `PlankPenalty` covers the non-lethal cases (full scatter, partial steal).
+
+**Predator zones scale with activity, not trap count.** An idle fish patrols on a slow shared loop (15 ticks/s). A zone with a player inside moves to a per-frame chase loop. Cost follows the number of players being chased, not the number of zones on the map.
+
+**Client-server sync without spam.** The leaderboard timer is interpolated locally every frame, while the server only broadcasts on actual state changes (start, pause, finish).
+
+**Admin tooling that never trusts the client.** Session analytics (join time, attempts, finish status, region) are stored in a separate DataStore and exposed through a `RemoteFunction`. The server handler checks the caller's `UserId` against an allowlist before returning anything. The in-game panel (toggle with `L`) destroys itself on the client for anyone outside the allowlist, but the real access control lives on the server.
+
+---
+
+## Tools & Workflow
+
+- Rojo project file and sourcemap for Luau LSP in VS Code
+- Git + GitHub for version control
+- Claude via Roblox Studio MCP for code review, refactoring and debugging; design and implementation decisions are mine
+
+---
 
 ## Design Document
 
-The full game design — modes, leaderboard structure, save system, and UI flow — is documented in [DESIGN.md](./DESIGN.md).
+Planned features (game modes, per-level leaderboards, save system, UI flow) are described in [DESIGN.md](./DESIGN.md).
 
-## Tools & Workflow
-- [Rojo](https://rojo.space/) for VS Code ↔ Roblox Studio sync
-- Git + GitHub for version control
+---
 
 ## Project Structure
 
 ```
-src/
-├── ReplicatedStorage/
-│ ├── CountdownState.luau
-│ └── DevConfig.example.luau (copy to DevConfig.luau and fill in your own UserId — gitignored)
-├── ServerScriptService/
-│ ├── FinishTrigger.server.luau
-│ ├── LevelEnds.server.luau
-│ ├── AnalyticsAdmin.server.luau
-│ └── MainGame/
-│ ├── init.server.luau
-│ └── Services/
-│ ├── AnalyticsService.luau
-│ ├── BonusService.luau
-│ ├── BridgeService.luau
-│ ├── CharacterLock.luau
-│ ├── CollisionGroups.luau
-│ ├── LeaderboardService.luau
-│ ├── LevelProgress.luau
-│ ├── PlankService.luau
-│ └── InteractablesManager.server.luau
-│ └── Interactables/
-│ ├── Geyser.luau
-│ ├── SpikeTrap.luau
-│ └── Trampoline.luau
-├── StarterCharacterScripts/
-│ ├── AutoRun.client.luau
-│ ├── PersonalPlanks.client.luau
-│ └── PlankStack.client.luau
-├── StarterPlayerScripts/
-│ ├── BonusEffectClient.client.luau
-│ ├── CameraLocal.client.luau
-│ ├── DrownEffect.client.luau
-│ ├── LevelTransitionEffect.client.luau
-│ ├── LevelVisibility.client.luau
-│ ├── MapEffects.client.luau
-│ ├── PlankScatterEffect.client.luau
-│ └── SoundClient.client.luau
-└── StarterGui/
-├── AdminAnalyticsGui/
-├── CountdownGui/
-├── FinishScreen/
-├── HudGui/
-└── LeaderboardGui/
+ReplicatedStorage/
+├── CountdownState
+└── DevConfig                      (copy DevConfig.example.luau and fill in your own UserId; gitignored)
+
+ServerScriptService/
+├── FinishTrigger
+├── LevelEnds
+├── AnalyticsAdmin
+├── WhirlpoolManager
+└── MainGame/
+    └── Services/
+        ├── AnalyticsService
+        ├── BonusService
+        ├── BridgeService
+        ├── CharacterLock
+        ├── CheckpointService
+        ├── CollisionGroups
+        ├── CurrentZones
+        ├── LeaderboardService
+        ├── LethalHit
+        ├── LevelProgress
+        ├── PlankPenalty
+        ├── PlankPool
+        ├── PlankService
+        ├── PlayerStatus
+        ├── SpawnGate
+        └── InteractablesManager/
+            └── Interactables/
+                ├── Geyser
+                ├── PredatorZone
+                ├── SpikeTrap
+                ├── SpinningLog
+                └── Trampoline
+
+ServerStorage/
+└── Whirlpool
+
+StarterCharacterScripts/
+├── AutoRun
+├── PersonalPlanks
+└── PlankStack
+
+StarterPlayerScripts/
+├── BonusEffectClient
+├── CameraLocal
+├── DrownEffect
+├── LevelTransitionEffect
+├── LevelVisibility
+├── PlankScatterEffect
+├── SoundClient
+├── MapEffectsManager/
+│   └── Effects/
+│       ├── CurrentWaterEffect
+│       └── TrampolineEffects
+└── Modules/
+    └── PlankVisualsRegistry
+
+StarterGui/
+├── AdminAnalyticsGui
+├── CountdownGui
+├── FinishScreen
+├── HudGui
+└── LeaderboardGui
 ```
-## Play
-[Play on Roblox](https://www.roblox.com/games/97476080303924/Plank-Rush)
-
-
