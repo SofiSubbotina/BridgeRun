@@ -34,31 +34,6 @@ Built solo: server and client code, game systems, UI and level layout.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Client
-        C1[AutoRun / PersonalPlanks / PlankStack]
-        C2[GUIs: HUD, Leaderboard, Countdown, Finish]
-        C3[MapEffectsManager, LevelVisibility, effects]
-    end
-
-    R{{Remotes}}
-
-    subgraph Server
-        M[MainGame<br/>player lifecycle]
-        S[Services<br/>Bridge, Plank, Bonus, Leaderboard,<br/>LevelProgress, Checkpoint, SpawnGate,<br/>PlayerStatus, CollisionGroups, Analytics]
-        I[InteractablesManager<br/>tag registry]
-        T[Interactables<br/>SpikeTrap, Trampoline, Geyser,<br/>SpinningLog, PredatorZone]
-        W[WhirlpoolManager]
-    end
-
-    Client <--> R <--> M
-    M --> S
-    I --> T
-    T --> S
-    W --> S
-```
-
 - `MainGame` owns the player lifecycle (spawn, death, respawn, cleanup) and delegates everything else to single-purpose services under `MainGame/Services`. Each system can be reasoned about on its own, without tangling unrelated features together
 - Interactive map objects are found through `CollectionService` tags and started by `InteractablesManager`; each mechanic is its own module
 - The client never decides gameplay outcomes: pickups, bonuses, level access and admin data are validated on the server
