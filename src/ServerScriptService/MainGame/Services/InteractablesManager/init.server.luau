@@ -17,6 +17,7 @@ local REGISTRY = {
 	{ tag = "Geyser",    module = require(Interactables.Geyser)    },
 	{ tag = "SpinningLog",  module = require(Interactables.SpinningLog)  },
 	{ tag = "PredatorFish", module = require(Interactables.PredatorZone) },
+	{ tag = "FallingPlatform", module = require(Interactables.FallingPlatform) }
 }
 
 for _, entry in REGISTRY do
