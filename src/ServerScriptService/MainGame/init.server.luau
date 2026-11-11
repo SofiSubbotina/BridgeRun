@@ -17,8 +17,10 @@ local PlayerStatus       = require(script.Services.PlayerStatus)
 local LevelProgress      = require(script.Services.LevelProgress)
 local SpawnGate           = require(script.Services.SpawnGate)
 local CheckpointService  = require(script.Services.CheckpointService)
+local PlankPenalty       = require(script.Services.PlankPenalty)
 
 local remotes          = ReplicatedStorage:WaitForChild("Remotes")
+local evBonusEffect    = remotes:WaitForChild("BonusEffect")
 local evUpdate         = remotes:WaitForChild("PlankUpdate")
 local evCollect        = remotes:WaitForChild("PlankCollected")
 local evSound          = remotes:WaitForChild("PlaySound")
@@ -28,7 +30,9 @@ local evReady          = remotes:WaitForChild("ClientReady")
 local evStartCountdown = remotes:WaitForChild("StartCountdown")
 local evLevelReset     = remotes:WaitForChild("LevelReset")
 
--- Plank amounts keyed by template name, used to validate pickup events.
+-- Plank amounts keyed by template instance, used to validate pickup events.
+-- A negative "Planks" attribute marks a rotten plank: picking it up takes
+-- planks away instead of adding them (see the pickup handler below).
 -- PlanksTemplate is organised into per-level sub-folders (Level1, Level2, …).
 local planksTemplate = ReplicatedStorage
 	:WaitForChild("Clones")
@@ -37,7 +41,8 @@ local planksTemplate = ReplicatedStorage
 local templateData = {}
 for _, levelFolder in ipairs(planksTemplate:GetChildren()) do
 	local levelId = tonumber(levelFolder.Name:match("^Level(%d+)$")) or 1
-	for _, part in ipairs(levelFolder:GetChildren()) do
+	for _, part in ipairs(levelFolder:GetDescendants()) do
+		if not part:IsA("BasePart") then continue end
 		templateData[part] = {
 		amount = part:GetAttribute("Planks") or 1,
 		position = part.Position,
@@ -164,6 +169,14 @@ Players.PlayerAdded:Connect(function(player)
 		if (root.Position - template.position).Magnitude > CONFIG.PICKUP_MAX_DISTANCE then return end
 
 		if collected then collected[plankInstance] = true end
+
+		if template.amount < 0 then
+			local removed = PlankPenalty.Steal(player, -template.amount)
+			if removed > 0 then
+				evBonusEffect:FireClient(player, "penalty", string.format("-%d planks", removed), "PenaltySound")
+			end
+			return
+		end
 
 		PlankService.Add(player, template.amount)
 		syncPlanks(player)

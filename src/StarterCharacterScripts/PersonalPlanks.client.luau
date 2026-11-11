@@ -72,7 +72,7 @@ local function attachBillboard(part, amount)
 	label.Size                   = UDim2.new(1, -32, 1, 0)
 	label.Position               = UDim2.new(0, 32, 0, 0)
 	label.BackgroundTransparency = 1
-	label.Text                   = "+" .. tostring(amount)
+	label.Text                   = (amount >= 0 and "+" or "") .. tostring(amount)
 	label.TextColor3             = Color3.fromRGB(255, 240, 180)
 	label.TextScaled             = true
 	label.Font                   = Enum.Font.GothamBold
@@ -84,6 +84,7 @@ end
 -- Builds pool entries from a single level folder.
 local function buildPoolForLevel(levelFolder, levelId)
 	for _, template in ipairs(levelFolder:GetChildren()) do
+		if not template:IsA("BasePart") then continue end
 		local amount = template:GetAttribute("Planks") or 1
 
 		local part = template:Clone()
